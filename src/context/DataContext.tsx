@@ -195,144 +195,55 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, [autoRefreshEnabled, autoRefreshInterval, defaultSearchEmail]);
 
   // Update auto-refresh interval (in milliseconds)
-  const updateAutoRefreshInterval = (interval: number) => {
-    // Ensure interval is at least 10 seconds
-    const validInterval = Math.max(10000, interval);
-    setAutoRefreshInterval(validInterval);
-    localStorage.setItem("autoRefreshInterval", validInterval.toString());
-    
-    // Clear existing timer
-    if (autoRefreshTimer) {
-      clearInterval(autoRefreshTimer);
+  const updateAutoRefreshInterval = async (interval: number) => {
+    try {
+      const { error } = await supabase
+        .from('admin_settings')
+        .upsert({
+          auto_refresh_interval: interval
+        });
+
+      if (error) throw error;
+
+      setAutoRefreshInterval(interval);
+      toast({
+        title: "Success",
+        description: "Auto-refresh interval updated",
+      });
+    } catch (error) {
+      console.error('Error updating auto-refresh interval:', error);
+      toast({
+        title: "Error",
+        description: "Failed to update auto-refresh interval",
+        variant: "destructive"
+      });
     }
-    
-    // Set up new timer if auto-refresh is enabled
-    if (autoRefreshEnabled && defaultSearchEmail) {
-      const timer = setInterval(async () => {
-        try {
-          const { data, error } = await supabase.functions.invoke('search-emails', {
-            body: { 
-              searchEmail: defaultSearchEmail,
-              includeRead: true,
-              includeUnread: true,
-              includeForwarded: true,
-              includeDomainForwarded: true,
-              includeImportant: true,
-              includeGrouped: true,
-              includeUngrouped: true,
-              minutesBack: 30,
-              fetchUnread: true
-            }
-          });
-
-          if (error) throw error;
-
-          if (data.emails && Array.isArray(data.emails)) {
-            const formattedEmails: Email[] = data.emails.map((email: any) => ({
-              id: email.id,
-              from: email.from || "Unknown Sender",
-              to: email.to || "Unknown Recipient",
-              subject: email.subject || "No Subject",
-              body: email.body || "No content available",
-              date: email.date || new Date().toISOString(),
-              isRead: email.isRead || false,
-              isHidden: false,
-              matchedIn: email.matchedIn || "unknown",
-              extractedRecipients: email.extractedRecipients || [],
-              rawMatch: email.rawMatch || null,
-              isForwardedEmail: email.isForwardedEmail || false,
-              isCluster: email.isCluster || false,
-              isDomainForwarded: email.isDomainForwarded || false,
-              isImportant: email.isImportant || false,
-              isGrouped: email.isGrouped || false
-            }));
-
-            saveEmailsToLocalStorage(formattedEmails);
-            setEmails(prev => [...prev, ...formattedEmails]);
-          }
-        } catch (error) {
-          console.error('Auto-fetch error:', error);
-        }
-      }, validInterval);
-      
-      setAutoRefreshTimer(timer);
-    }
-    
-    toast({
-      title: "Auto-Refresh Interval Updated",
-      description: `Emails will refresh every ${Math.round(validInterval / 1000)} seconds.`,
-    });
   };
 
   // Toggle auto-refresh on/off
-  const toggleAutoRefresh = (enabled: boolean) => {
-    setAutoRefreshEnabled(enabled);
-    localStorage.setItem("autoRefreshEnabled", enabled.toString());
-    
-    // Clear existing timer if disabling
-    if (!enabled && autoRefreshTimer) {
-      clearInterval(autoRefreshTimer);
-      setAutoRefreshTimer(null);
+  const toggleAutoRefresh = async (enabled: boolean) => {
+    try {
+      const { error } = await supabase
+        .from('admin_settings')
+        .upsert({
+          auto_refresh_enabled: enabled
+        });
+
+      if (error) throw error;
+
+      setAutoRefreshEnabled(enabled);
+      toast({
+        title: "Success",
+        description: `Auto-refresh ${enabled ? 'enabled' : 'disabled'}`,
+      });
+    } catch (error) {
+      console.error('Error toggling auto-refresh:', error);
+      toast({
+        title: "Error",
+        description: "Failed to toggle auto-refresh",
+        variant: "destructive"
+      });
     }
-    
-    // Set up new timer if enabling
-    if (enabled && defaultSearchEmail) {
-      const timer = setInterval(async () => {
-        try {
-          const { data, error } = await supabase.functions.invoke('search-emails', {
-            body: { 
-              searchEmail: defaultSearchEmail,
-              includeRead: true,
-              includeUnread: true,
-              includeForwarded: true,
-              includeDomainForwarded: true,
-              includeImportant: true,
-              includeGrouped: true,
-              includeUngrouped: true,
-              minutesBack: 30,
-              fetchUnread: true
-            }
-          });
-
-          if (error) throw error;
-
-          if (data.emails && Array.isArray(data.emails)) {
-            const formattedEmails: Email[] = data.emails.map((email: any) => ({
-              id: email.id,
-              from: email.from || "Unknown Sender",
-              to: email.to || "Unknown Recipient",
-              subject: email.subject || "No Subject",
-              body: email.body || "No content available",
-              date: email.date || new Date().toISOString(),
-              isRead: email.isRead || false,
-              isHidden: false,
-              matchedIn: email.matchedIn || "unknown",
-              extractedRecipients: email.extractedRecipients || [],
-              rawMatch: email.rawMatch || null,
-              isForwardedEmail: email.isForwardedEmail || false,
-              isCluster: email.isCluster || false,
-              isDomainForwarded: email.isDomainForwarded || false,
-              isImportant: email.isImportant || false,
-              isGrouped: email.isGrouped || false
-            }));
-
-            saveEmailsToLocalStorage(formattedEmails);
-            setEmails(prev => [...prev, ...formattedEmails]);
-          }
-        } catch (error) {
-          console.error('Auto-fetch error:', error);
-        }
-      }, autoRefreshInterval);
-      
-      setAutoRefreshTimer(timer);
-    }
-    
-    toast({
-      title: enabled ? "Auto-Refresh Enabled" : "Auto-Refresh Disabled",
-      description: enabled 
-        ? `Emails will automatically refresh every ${Math.round(autoRefreshInterval / 1000)} seconds.` 
-        : "Automatic email refreshing is now disabled.",
-    });
   };
 
   // Load email limit from local storage with enhanced validation
@@ -367,18 +278,29 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   // Update email limit with strict validation
-  const updateEmailLimit = (limit: number) => {
-    // Ensure limit is a valid number and at least 1
-    const validLimit = (!isNaN(limit) && limit >= 1) ? limit : 1;
-    
-    console.log("Updating email limit to:", validLimit);
-    setEmailLimit(validLimit);
-    localStorage.setItem("emailLimit", validLimit.toString());
-    
-    toast({
-      title: "Email Limit Updated",
-      description: `Users will now see up to ${validLimit} emails in search results.`,
-    });
+  const updateEmailLimit = async (limit: number) => {
+    try {
+      const { error } = await supabase
+        .from('admin_settings')
+        .upsert({
+          email_limit: limit
+        });
+
+      if (error) throw error;
+
+      setEmailLimit(limit);
+      toast({
+        title: "Success",
+        description: "Email limit updated",
+      });
+    } catch (error) {
+      console.error('Error updating email limit:', error);
+      toast({
+        title: "Error",
+        description: "Failed to update email limit",
+        variant: "destructive"
+      });
+    }
   };
 
   // Load default search email from local storage
@@ -390,13 +312,29 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   // Update default search email
-  const updateDefaultSearchEmail = async (email: string): Promise<void> => {
-    setDefaultSearchEmail(email);
-    localStorage.setItem("defaultSearchEmail", email);
-    toast({
-      title: "Default Search Email Updated",
-      description: `Search will now fetch emails from ${email}`,
-    });
+  const updateDefaultSearchEmail = async (email: string) => {
+    try {
+      const { error } = await supabase
+        .from('admin_settings')
+        .upsert({
+          default_search_email: email
+        });
+
+      if (error) throw error;
+
+      setDefaultSearchEmail(email);
+      toast({
+        title: "Success",
+        description: "Default search email updated",
+      });
+    } catch (error) {
+      console.error('Error updating default search email:', error);
+      toast({
+        title: "Error",
+        description: "Failed to update default search email",
+        variant: "destructive"
+      });
+    }
   };
 
   // Fetch data using Edge Functions
@@ -675,18 +613,25 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Get server storage statistics
   const getServerStorageStats = async () => {
     try {
-      const { data, error } = await supabase.functions.invoke('get-server-storage-stats');
+      const { data, error } = await supabase
+        .from('server_storage_stats')
+        .select('*')
+        .single();
+
       if (error) throw error;
-      
-      if (data) {
-        setServerStorageStats({
-          totalEmails: data.totalEmails || 0,
-          lastUpdated: data.lastUpdated || '',
-          storageSize: data.storageSize || '0 MB'
-        });
-      }
+
+      setServerStorageStats({
+        totalEmails: data.total_emails,
+        storageSize: data.storage_size,
+        lastUpdated: data.last_updated
+      });
     } catch (error) {
       console.error('Error getting server storage stats:', error);
+      toast({
+        title: "Error",
+        description: "Failed to get server storage statistics",
+        variant: "destructive"
+      });
     }
   };
 
@@ -754,71 +699,126 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
   }, [defaultSearchEmail]);
 
-  // Save emails to server storage with domain-based replacement
+  // Function to save emails to server storage
   const saveEmailsToServer = async (emails: Email[]) => {
     try {
-      const today = new Date().toISOString().split('T')[0];
-      
       // Group emails by domain
-      const emailsByDomain = emails.reduce((acc: { [key: string]: Email[] }, email) => {
-        const domain = email.from.split('@')[1] || 'unknown';
+      const emailsByDomain = emails.reduce((acc, email) => {
+        const domain = email.to.split('@')[1];
         if (!acc[domain]) {
           acc[domain] = [];
         }
         acc[domain].push(email);
         return acc;
-      }, {});
+      }, {} as Record<string, Email[]>);
 
       // Save each domain's emails
       for (const [domain, domainEmails] of Object.entries(emailsByDomain)) {
-        const { error } = await supabase.functions.invoke('save-emails-to-server', {
-          body: {
-            emails: domainEmails,
-            date: today,
-            domain: domain
-          }
+        const { error } = await supabase
+          .from('server_emails')
+          .upsert(
+            domainEmails.map(email => ({
+              id: email.id,
+              domain,
+              email_data: email
+            })),
+            { onConflict: 'id' }
+          );
+
+        if (error) {
+          console.error('Error saving emails to server:', error);
+          toast({
+            title: "Error",
+            description: "Failed to save emails to server storage",
+            variant: "destructive"
+          });
+        }
+      }
+
+      // Update server storage stats
+      await updateServerStorageStats();
+    } catch (error) {
+      console.error('Error in saveEmailsToServer:', error);
+      toast({
+        title: "Error",
+        description: "Failed to save emails to server storage",
+        variant: "destructive"
+      });
+    }
+  };
+
+  // Function to update server storage stats
+  const updateServerStorageStats = async () => {
+    try {
+      // Get total emails count
+      const { count, error: countError } = await supabase
+        .from('server_emails')
+        .select('*', { count: 'exact', head: true });
+
+      if (countError) throw countError;
+
+      // Calculate storage size
+      const { data: emails, error: dataError } = await supabase
+        .from('server_emails')
+        .select('email_data');
+
+      if (dataError) throw dataError;
+
+      const totalSize = emails.reduce((acc, email) => {
+        return acc + JSON.stringify(email.email_data).length;
+      }, 0);
+
+      const storageSize = `${(totalSize / (1024 * 1024)).toFixed(2)} MB`;
+
+      // Update stats
+      const { error: updateError } = await supabase
+        .from('server_storage_stats')
+        .upsert({
+          total_emails: count || 0,
+          storage_size: storageSize,
+          last_updated: new Date().toISOString()
         });
 
-        if (error) throw error;
-      }
-    } catch (error) {
-      console.error('Error saving emails to server:', error);
-    }
-  };
+      if (updateError) throw updateError;
 
-  // Load emails from server storage
-  const loadEmailsFromServer = async (date: string): Promise<Email[]> => {
-    try {
-      const { data, error } = await supabase.functions.invoke('load-emails-from-server', {
-        body: { date }
+      // Update local state
+      setServerStorageStats({
+        totalEmails: count || 0,
+        storageSize,
+        lastUpdated: new Date().toISOString()
       });
-
-      if (error) throw error;
-      return data?.emails || [];
     } catch (error) {
-      console.error('Error loading emails from server:', error);
-      return [];
+      console.error('Error updating server storage stats:', error);
+      toast({
+        title: "Error",
+        description: "Failed to update server storage statistics",
+        variant: "destructive"
+      });
     }
   };
 
-  // Clear server storage with confirmation
+  // Function to clear server storage
   const clearServerStorage = async () => {
     try {
-      const { error } = await supabase.functions.invoke('clear-server-storage');
+      const { error } = await supabase
+        .from('server_emails')
+        .delete()
+        .neq('id', ''); // Delete all records
+
       if (error) throw error;
-      
-      // Update stats after clearing
-      await getServerStorageStats();
-      
+
+      // Update stats
+      await updateServerStorageStats();
+
       toast({
-        title: "Server Storage Cleared",
-        description: "All emails in server storage have been cleared.",
+        title: "Success",
+        description: "Server storage has been cleared",
       });
     } catch (error) {
       console.error('Error clearing server storage:', error);
       toast({
         title: "Error",
-        description: "Failed to clear server storage.",
+        description: "Failed to clear server storage",
         variant: "destructive"
       });
     }

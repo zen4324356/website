@@ -1,7 +1,7 @@
 export interface User {
   id: string;
-  accessToken: string;
-  isBlocked: boolean;
+  email: string;
+  created_at: string;
 }
 
 export interface Admin {
@@ -11,14 +11,18 @@ export interface Admin {
 
 export interface GoogleAuthConfig {
   id: string;
-  clientId: string;
-  clientSecret: string;
-  projectId: string;
-  authUri: string;
-  tokenUri: string;
-  authProviderCertUrl: string;
-  isActive: boolean;
-  access_token?: string;
+  client_id: string;
+  client_secret: string;
+  project_id: string | null;
+  auth_uri: string;
+  token_uri: string;
+  auth_provider_cert_url: string;
+  is_active: boolean;
+  access_token: string | null;
+  refresh_token: string | null;
+  token_expiry: string | null;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface Email {
@@ -32,33 +36,12 @@ export interface Email {
   isHidden: boolean;
   matchedIn: string;
   extractedRecipients: string[];
-  rawMatch: any;
+  rawMatch: string | null;
   isForwardedEmail: boolean;
   isCluster: boolean;
   isDomainForwarded: boolean;
   isImportant: boolean;
   isGrouped: boolean;
-  isLargeCluster?: boolean;
-  recipientCount?: number;
-  rawContent?: string | null;
-  rawHeaders?: string | null;
-  forwardedData?: {
-    fromEmail: string | null;
-    fromName: string | null;
-    date: string | null;
-    subject: string | null;
-    forwardedCount?: number;
-    nestedLevel?: number;
-    isNetflixRelated?: boolean;
-    importantSections?: string[];
-  } | null;
-  forwardedContent?: Array<{
-    from?: string;
-    to?: string;
-    subject?: string;
-    date?: string;
-    body?: string;
-  }>;
 }
 
 export interface AuthContextType {
@@ -92,4 +75,44 @@ export interface DataContextType {
   autoRefreshEnabled: boolean;
   updateAutoRefreshInterval: (interval: number) => void;
   toggleAutoRefresh: (enabled: boolean) => void;
+}
+
+export interface AdminSettings {
+  id: string;
+  email_limit: number;
+  auto_refresh_enabled: boolean;
+  auto_refresh_interval: number;
+  default_search_email: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ServerStorageStats {
+  id: string;
+  total_emails: number;
+  storage_size: string;
+  last_updated: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ServerEmail {
+  id: string;
+  domain: string;
+  email_data: Email;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AccessToken {
+  id: string;
+  access_token: string;
+  is_blocked: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AdminCredentials {
+  username: string;
+  password: string;
 }
