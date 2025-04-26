@@ -616,20 +616,41 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const { data, error } = await supabase
         .from('server_storage_stats')
         .select('*')
+        .order('created_at', { ascending: false })
+        .limit(1)
         .single();
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error getting server storage stats:', error);
+        throw error;
+      }
+
+      if (!data) {
+        // If no stats exist, create initial stats
+        const { data: newData, error: insertError } = await supabase
+          .from('server_storage_stats')
+          .insert({
+            total_emails: 0,
+            storage_size: '0 MB',
+            last_updated: null
+          })
+          .select()
+          .single();
+
+        if (insertError) throw insertError;
+        data = newData;
+      }
 
       setServerStorageStats({
-        totalEmails: data.total_emails,
-        storageSize: data.storage_size,
-        lastUpdated: data.last_updated
+        totalEmails: data.total_emails || 0,
+        storageSize: data.storage_size || '0 MB',
+        lastUpdated: data.last_updated || null
       });
     } catch (error) {
-      console.error('Error getting server storage stats:', error);
+      console.error('Error in getServerStorageStats:', error);
       toast({
         title: "Error",
-        description: "Failed to get server storage statistics",
+        description: "Failed to get server storage statistics. Please try again.",
         variant: "destructive"
       });
     }
