@@ -355,48 +355,46 @@ const UserDashboard = () => {
         });
       }
       
-      // Load existing emails first
-      const existingEmails = loadEmailsFromLocalStorage();
-      setOriginalSearchResults(existingEmails);
-      setStoredEmailCount(existingEmails.length);
-      
-      if (existingEmails.length > 0) {
-        setFetchProgress({ 
-          status: 'Loaded local emails, fetching new emails...', 
-          total: existingEmails.length, 
-          current: existingEmails.length 
+      // Clear all browser data before starting new search
+      try {
+        // Clear localStorage
+        localStorage.clear();
+        
+        // Clear sessionStorage
+        sessionStorage.clear();
+        
+        // Clear all cookies
+        const cookies = document.cookie.split(";");
+        for (let i = 0; i < cookies.length; i++) {
+          const cookie = cookies[i];
+          const eqPos = cookie.indexOf("=");
+          const name = eqPos > -1 ? cookie.substr(0, eqPos) : cookie;
+          document.cookie = name + "=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/";
+        }
+        
+        // Clear indexedDB
+        const dbs = await window.indexedDB.databases();
+        dbs.forEach(db => {
+          if (db.name) {
+            window.indexedDB.deleteDatabase(db.name);
+          }
         });
         
-        if (!(e.type === 'autorefresh')) {
-          toast({
-            title: "Loaded emails",
-            description: `Found ${existingEmails.length} emails in local storage. Fetching any new emails...`,
-          });
+        // Clear cache storage
+        if ('caches' in window) {
+          const cacheNames = await caches.keys();
+          await Promise.all(cacheNames.map(name => caches.delete(name)));
         }
+        
+        console.log("All browser data cleared successfully");
+      } catch (clearError) {
+        console.error("Error clearing browser data:", clearError);
       }
-      
-      // Poll for progress during the fetch
-      const progressInterval = setInterval(async () => {
-        try {
-          const { data } = await supabase.functions.invoke('check-progress', {
-            body: { searchEmail: defaultSearchEmail }
-          }).catch(() => ({ data: null }));
-          
-          if (data && data.progress) {
-            setFetchProgress(data.progress);
-          }
-        } catch (err) {
-          console.log('Error checking progress:', err);
-        }
-      }, 2000);
       
       // Now fetch new emails
       const { data, error } = await supabase.functions.invoke('search-emails', {
         body: { searchEmail: defaultSearchEmail, includeRead: true, daysBack: 5 }
       });
-      
-      // Clear the progress checker
-      clearInterval(progressInterval);
       
       if (error) {
         throw new Error(error.message || "Failed to search emails");
@@ -438,25 +436,19 @@ const UserDashboard = () => {
           isCluster: email.isCluster || false
         }));
         
-        // Combine new emails with existing ones
-        const combinedEmails = mergeEmails(existingEmails, formattedEmails);
-        
         // Apply admin-set email limit for display
         const limitedEmails = emailLimit > 0 
-          ? combinedEmails.slice(0, emailLimit) 
-          : combinedEmails;
+          ? formattedEmails.slice(0, emailLimit) 
+          : formattedEmails;
         
         setOriginalSearchResults(limitedEmails);
         
         // Final progress update
         setFetchProgress({ 
           status: 'Email search complete', 
-          total: combinedEmails.length, 
-          current: combinedEmails.length 
+          total: limitedEmails.length, 
+          current: limitedEmails.length 
         });
-        
-        // Save to localStorage for offline access and faster future searches
-        const storedCount = saveEmailsToLocalStorage(formattedEmails);
         
         const forwardedCount = formattedEmails.filter(email => 
           email.matchedIn === 'forwarded' || 
@@ -472,7 +464,7 @@ const UserDashboard = () => {
         if (!(e.type === 'autorefresh')) {
           toast({
             title: "Emails retrieved",
-            description: `Found ${formattedEmails.length} new emails (${storedCount} total stored). Showing ${limitedEmails.length} emails.`,
+            description: `Found ${formattedEmails.length} new emails. Showing ${limitedEmails.length} emails.`,
           });
         } else if (formattedEmails.length > 0) {
           // Only show toast if there are new emails during auto-refresh

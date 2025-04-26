@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Email } from "@/types";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Mail, Clock, User, Download, Forward, Users, AlertTriangle } from "lucide-react";
+import { Mail, Clock, User, Users, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 
@@ -447,13 +447,6 @@ Original email may contain HTML content that could not be processed.`;
             <div className="space-y-4 mb-6">
               <div className="flex justify-between">
                 <h3 className="text-lg font-medium text-over-video">{email.subject || 'No Subject'}</h3>
-                {email.rawContent && (
-                  <button 
-                    onClick={handleDownload} 
-                    className="netflix-button button-over-video">
-                    Download
-                  </button>
-                )}
               </div>
               
               <div className="grid grid-cols-[auto,1fr] gap-2 text-sm text-netflix-lightgray">
