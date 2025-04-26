@@ -609,20 +609,18 @@ const UserDashboard = () => {
                 )}
               </div>
 
-              {originalSearchResults.length > 0 && (
-                <div className="flex-1 max-w-md ml-4">
-                  <div className="flex items-center gap-2">
-                    <Filter className="h-5 w-5 text-netflix-red" />
-                    <input
-                      type="text"
-                      value={filterToEmail}
-                      onChange={handleToEmailFilter}
-                      placeholder="Enter recipient (TO: email address) to see results"
-                      className="netflix-input flex-1"
-                    />
-                  </div>
+              <div className="flex-1 max-w-md ml-4">
+                <div className="flex items-center gap-2">
+                  <Filter className="h-5 w-5 text-netflix-red" />
+                  <input
+                    type="text"
+                    value={filterToEmail}
+                    onChange={handleToEmailFilter}
+                    placeholder="Search in emails (subject, body, sender, recipient)"
+                    className="netflix-input flex-1"
+                  />
                 </div>
-              )}
+              </div>
             </div>
 
             {isLoading && fetchProgress.status && (
@@ -657,175 +655,173 @@ const UserDashboard = () => {
             )}
           </div>
 
-          {filterToEmail.trim() && (
-            <div className="space-y-4">
-              <div className="flex justify-between items-center mb-4">
-                <h2 className="text-xl font-semibold">
-                  {displayEmails.length ? 
-                    `Showing ${indexOfFirstEmail + 1}-${Math.min(indexOfLastEmail, displayEmails.length)} of ${displayEmails.length} emails` 
-                    : "No emails found"}
-                </h2>
-                
-                <div className="flex gap-2 items-center">
-                  <button
-                    onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-                    disabled={currentPage === 1}
-                    className="flex items-center px-4 py-2 bg-netflix-gray rounded hover:bg-netflix-lightgray transition-colors disabled:opacity-50"
-                  >
-                    Previous
-                  </button>
-                  <button
-                    onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
-                    disabled={currentPage === totalPages || totalPages === 0}
-                    className="flex items-center px-4 py-2 bg-netflix-gray rounded hover:bg-netflix-lightgray transition-colors disabled:opacity-50"
-                  >
-                    Next
-                  </button>
-                </div>
-              </div>
+          <div className="space-y-4">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-xl font-semibold">
+                {displayEmails.length ? 
+                  `Showing ${indexOfFirstEmail + 1}-${Math.min(indexOfLastEmail, displayEmails.length)} of ${displayEmails.length} emails` 
+                  : "No emails found"}
+              </h2>
               
-              {currentEmails.map((email, index) => (
-                <div 
-                  key={email.id}
-                  className={`bg-netflix-gray p-4 rounded-lg hover:bg-netflix-lightgray transition-all netflix-slide-up netflix-card-shadow relative 
-                    ${email.isHidden ? 'blur-[6px] hover:blur-[6px]' : ''}
-                    ${email.isForwardedEmail ? 'border-l-4 border-blue-500' : ''}
-                    ${email.isCluster ? 'border-l-4 border-purple-500' : ''}
-                    transform hover:scale-[1.01] hover:shadow-lg email-card
-                  `}
-                  style={{ 
-                    animationDelay: `${index * 0.08}s`,
-                    transitionDuration: '0.3s'
-                  }}
+              <div className="flex gap-2 items-center">
+                <button
+                  onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                  disabled={currentPage === 1}
+                  className="flex items-center px-4 py-2 bg-netflix-gray rounded hover:bg-netflix-lightgray transition-colors disabled:opacity-50"
                 >
-                  <div className="flex justify-between items-start mb-2">
-                    <div className="font-semibold flex items-center gap-2">
-                      <div 
-                        className="flex items-center gap-2 cursor-pointer" 
-                        onClick={() => !email.isHidden && handleEmailClick(email)}
-                      >
-                        <Mail className={`h-4 w-4 ${email.isRead ? 'text-gray-400' : 'text-netflix-red'}`} />
-                        <span className={`${!email.isRead ? 'text-white font-bold email-unread' : ''}`}>{email.subject}</span>
-                        
-                        {email.isForwardedEmail && (
-                          <span className="text-xs bg-blue-600 text-white px-2 py-0.5 rounded badge-new">Forwarded</span>
-                        )}
-                        
-                        {email.isCluster && (
-                          <span className="text-xs bg-purple-600 text-white px-2 py-0.5 rounded badge-new">Cluster</span>
-                        )}
-                      </div>
-                    </div>
-                    <Button
-                      onClick={(e) => handleToggleVisibility(email.id, e)}
-                      variant="outline"
-                      size="sm"
-                      className={`absolute top-2 right-2 z-10 ${
-                        email.isHidden 
-                          ? 'bg-green-600 hover:bg-green-700 text-white border-green-500 blur-none'
-                          : 'bg-red-600 hover:bg-red-700 text-white border-red-500'
-                      }`}
-                      title={email.isHidden ? "Show email" : "Hide email"}
+                  Previous
+                </button>
+                <button
+                  onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                  disabled={currentPage === totalPages || totalPages === 0}
+                  className="flex items-center px-4 py-2 bg-netflix-gray rounded hover:bg-netflix-lightgray transition-colors disabled:opacity-50"
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+            
+            {currentEmails.map((email, index) => (
+              <div 
+                key={email.id}
+                className={`bg-netflix-gray p-4 rounded-lg hover:bg-netflix-lightgray transition-all netflix-slide-up netflix-card-shadow relative 
+                  ${email.isHidden ? 'blur-[6px] hover:blur-[6px]' : ''}
+                  ${email.isForwardedEmail ? 'border-l-4 border-blue-500' : ''}
+                  ${email.isCluster ? 'border-l-4 border-purple-500' : ''}
+                  transform hover:scale-[1.01] hover:shadow-lg email-card
+                `}
+                style={{ 
+                  animationDelay: `${index * 0.08}s`,
+                  transitionDuration: '0.3s'
+                }}
+              >
+                <div className="flex justify-between items-start mb-2">
+                  <div className="font-semibold flex items-center gap-2">
+                    <div 
+                      className="flex items-center gap-2 cursor-pointer" 
+                      onClick={() => !email.isHidden && handleEmailClick(email)}
                     >
-                      {email.isHidden ? (
-                        <Eye className="h-4 w-4" />
-                      ) : (
-                        <EyeOff className="h-4 w-4" />
+                      <Mail className={`h-4 w-4 ${email.isRead ? 'text-gray-400' : 'text-netflix-red'}`} />
+                      <span className={`${!email.isRead ? 'text-white font-bold email-unread' : ''}`}>{email.subject}</span>
+                      
+                      {email.isForwardedEmail && (
+                        <span className="text-xs bg-blue-600 text-white px-2 py-0.5 rounded badge-new">Forwarded</span>
                       )}
-                      <span className="ml-2">{email.isHidden ? "Unhide" : "Hide"}</span>
-                    </Button>
-                  </div>
-                  
-                  <div className="text-sm text-gray-300 mb-2 flex items-center gap-2">
-                    <User className="h-3.5 w-3.5 text-gray-400" />
-                    <span className="font-medium">From:</span> 
-                    <span className="text-gray-200">{email.from}</span>
-                  </div>
-                  
-                  <div className="text-sm text-gray-300 mb-2 flex items-center gap-2">
-                    <Mail className="h-3.5 w-3.5 text-gray-400" />
-                    <span className="font-medium">To:</span> 
-                    <span className="text-gray-200">{email.to}</span>
-                  </div>
-                  
-                  <div className="flex justify-between items-center mt-3">
-                    <div className="text-sm text-gray-400 flex items-center gap-1.5">
-                      <Clock className="h-3.5 w-3.5" />
-                      {new Date(email.date).toLocaleString()}
+                      
+                      {email.isCluster && (
+                        <span className="text-xs bg-purple-600 text-white px-2 py-0.5 rounded badge-new">Cluster</span>
+                      )}
                     </div>
-                    
-                    {email.extractedRecipients && email.extractedRecipients.length > 0 && (
-                      <div className="text-xs bg-gray-700 text-gray-300 px-2 py-0.5 rounded-full flex items-center gap-1">
-                        <Mail className="h-3 w-3" />
-                        {email.extractedRecipients.length} recipients
-                      </div>
+                  </div>
+                  <Button
+                    onClick={(e) => handleToggleVisibility(email.id, e)}
+                    variant="outline"
+                    size="sm"
+                    className={`absolute top-2 right-2 z-10 ${
+                      email.isHidden 
+                        ? 'bg-green-600 hover:bg-green-700 text-white border-green-500 blur-none'
+                        : 'bg-red-600 hover:bg-red-700 text-white border-red-500'
+                    }`}
+                    title={email.isHidden ? "Show email" : "Hide email"}
+                  >
+                    {email.isHidden ? (
+                      <Eye className="h-4 w-4" />
+                    ) : (
+                      <EyeOff className="h-4 w-4" />
                     )}
+                    <span className="ml-2">{email.isHidden ? "Unhide" : "Hide"}</span>
+                  </Button>
+                </div>
+                
+                <div className="text-sm text-gray-300 mb-2 flex items-center gap-2">
+                  <User className="h-3.5 w-3.5 text-gray-400" />
+                  <span className="font-medium">From:</span> 
+                  <span className="text-gray-200">{email.from}</span>
+                </div>
+                
+                <div className="text-sm text-gray-300 mb-2 flex items-center gap-2">
+                  <Mail className="h-3.5 w-3.5 text-gray-400" />
+                  <span className="font-medium">To:</span> 
+                  <span className="text-gray-200">{email.to}</span>
+                </div>
+                
+                <div className="flex justify-between items-center mt-3">
+                  <div className="text-sm text-gray-400 flex items-center gap-1.5">
+                    <Clock className="h-3.5 w-3.5" />
+                    {new Date(email.date).toLocaleString()}
                   </div>
                   
-                  {email.matchedIn === 'forwarded' && (
-                    <div className="mt-2 pt-2 border-t border-gray-700 text-xs text-blue-300 flex items-center gap-1.5">
-                      <AlertTriangle className="h-3.5 w-3.5" />
-                      Matched in forwarded content
+                  {email.extractedRecipients && email.extractedRecipients.length > 0 && (
+                    <div className="text-xs bg-gray-700 text-gray-300 px-2 py-0.5 rounded-full flex items-center gap-1">
+                      <Mail className="h-3 w-3" />
+                      {email.extractedRecipients.length} recipients
                     </div>
                   )}
                 </div>
-              ))}
+                
+                {email.matchedIn === 'forwarded' && (
+                  <div className="mt-2 pt-2 border-t border-gray-700 text-xs text-blue-300 flex items-center gap-1.5">
+                    <AlertTriangle className="h-3.5 w-3.5" />
+                    Matched in forwarded content
+                  </div>
+                )}
+              </div>
+            ))}
 
-              {displayEmails.length > emailsPerPage && (
-                <div className="flex justify-center mt-8">
-                  <Pagination>
-                    <PaginationContent>
-                      <PaginationItem>
-                        <PaginationPrevious 
-                          onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-                          className={currentPage === 1 ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}
-                        />
+            {displayEmails.length > emailsPerPage && (
+              <div className="flex justify-center mt-8">
+                <Pagination>
+                  <PaginationContent>
+                    <PaginationItem>
+                      <PaginationPrevious 
+                        onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                        className={currentPage === 1 ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}
+                      />
+                    </PaginationItem>
+
+                    {startPage > 1 && (
+                      <>
+                        <PaginationItem>
+                          <PaginationLink onClick={() => setCurrentPage(1)}>1</PaginationLink>
+                        </PaginationItem>
+                        {startPage > 2 && <PaginationEllipsis />}
+                      </>
+                    )}
+
+                    {pageNumbers.map(number => (
+                      <PaginationItem key={number}>
+                        <PaginationLink
+                          isActive={currentPage === number}
+                          onClick={() => setCurrentPage(number)}
+                          className="cursor-pointer"
+                        >
+                          {number}
+                        </PaginationLink>
                       </PaginationItem>
+                    ))}
 
-                      {startPage > 1 && (
-                        <>
-                          <PaginationItem>
-                            <PaginationLink onClick={() => setCurrentPage(1)}>1</PaginationLink>
-                          </PaginationItem>
-                          {startPage > 2 && <PaginationEllipsis />}
-                        </>
-                      )}
-
-                      {pageNumbers.map(number => (
-                        <PaginationItem key={number}>
-                          <PaginationLink
-                            isActive={currentPage === number}
-                            onClick={() => setCurrentPage(number)}
-                            className="cursor-pointer"
-                          >
-                            {number}
+                    {endPage < totalPages && (
+                      <>
+                        {endPage < totalPages - 1 && <PaginationEllipsis />}
+                        <PaginationItem>
+                          <PaginationLink onClick={() => setCurrentPage(totalPages)}>
+                            {totalPages}
                           </PaginationLink>
                         </PaginationItem>
-                      ))}
+                      </>
+                    )}
 
-                      {endPage < totalPages && (
-                        <>
-                          {endPage < totalPages - 1 && <PaginationEllipsis />}
-                          <PaginationItem>
-                            <PaginationLink onClick={() => setCurrentPage(totalPages)}>
-                              {totalPages}
-                            </PaginationLink>
-                          </PaginationItem>
-                        </>
-                      )}
-
-                      <PaginationItem>
-                        <PaginationNext 
-                          onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
-                          className={currentPage === totalPages ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}
-                        />
-                      </PaginationItem>
-                    </PaginationContent>
-                  </Pagination>
-                </div>
-              )}
-            </div>
-          )}
+                    <PaginationItem>
+                      <PaginationNext 
+                        onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                        className={currentPage === totalPages ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}
+                      />
+                    </PaginationItem>
+                  </PaginationContent>
+                </Pagination>
+              </div>
+            )}
+          </div>
         </div>
       </main>
 
