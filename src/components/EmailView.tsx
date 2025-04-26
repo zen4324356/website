@@ -34,15 +34,21 @@ export const EmailView: React.FC<EmailViewProps> = ({
     }
   };
 
+  // Clean the email body: remove <a> tags, Â, and extra spaces
   const cleanBody = (body: string) => {
     if (!body) return '';
-    let cleaned = body.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '');
-    cleaned = cleaned.replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, '');
-    cleaned = cleaned.replace(/<[^>]*>/g, '');
-    cleaned = cleaned.replace(/[\u0000-\u001F\u007F-\u009F\u00A0\u00AD\u2000-\u200F\u2028-\u202F\u205F-\u206F\u3000\uFEFF]/g, '');
-    cleaned = cleaned.replace(/Â/g, '');
-    cleaned = cleaned.replace(/\s+/g, ' ').trim();
-    cleaned = cleaned.replace(/\n\s*\n/g, '\n\n');
+    let cleaned = body
+      // Remove script/style tags
+      .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
+      .replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, '')
+      // Remove all <a> tags but keep their text
+      .replace(/<a [^>]*>(.*?)<\/a>/gi, '$1')
+      // Remove all other HTML tags
+      .replace(/<[^>]*>/g, '')
+      // Remove non-printable characters and Â
+      .replace(/[\u0000-\u001F\u007F-\u009F\u00A0\u00AD\u2000-\u200F\u2028-\u202F\u205F-\u206F\u3000\uFEFFÂ]/g, '')
+      // Remove extra spaces and line breaks
+      .replace(/\s+/g, ' ').trim();
     return cleaned;
   };
 
