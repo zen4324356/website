@@ -484,8 +484,9 @@ Original email may contain HTML content that could not be processed.`;
         </div>
         <button
           onClick={onClose}
-          className="netflix-button button-over-video">
-          Close
+          className="p-1 hover:bg-netflix-gray rounded-full"
+        >
+          <X className="h-5 w-5" />
         </button>
       </div>
       

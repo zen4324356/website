@@ -2,7 +2,7 @@
 .email-content {
   font-family: Arial, sans-serif;
   line-height: 1.6;
-  color: #ffffff;
+  color: #FFFFFF;
 }
 
 .email-content a {
@@ -15,14 +15,22 @@
   height: auto;
 }
 
+.email-content pre,
+.email-content code {
+  background-color: #1a1a1a;
+  padding: 0.2em 0.4em;
+  border-radius: 3px;
+  font-family: monospace;
+}
+
 .email-content blockquote {
   border-left: 3px solid #404040;
-  margin: 0;
-  padding-left: 1rem;
+  margin: 1em 0;
+  padding-left: 1em;
   color: #808080;
 }
 
-/* Sidebar transition */
+/* Sidebar animation */
 .sidebar-enter {
   transform: translateX(100%);
 }

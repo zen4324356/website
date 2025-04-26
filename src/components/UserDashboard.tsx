@@ -548,33 +548,13 @@ const UserDashboard = () => {
       // Show loading state
       setIsSidebarOpen(true);
       
-      // Fetch full email content like Gmail
-      const response = await fetch(`/api/emails/${email.id}`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        }
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to fetch email content');
-      }
-
-      const fullEmail = await response.json();
-      
-      // Create a complete email object with full content
+      // Create a complete email object with the data we already have
       const emailToDisplay: Email = {
         ...email,
-        body: fullEmail.body || "No content available",
-        rawContent: fullEmail.rawContent,
-        rawHeaders: fullEmail.headers,
-        attachments: fullEmail.attachments || [],
         isRead: true,
-        isForwardedEmail: fullEmail.isForwardedEmail || false,
-        forwardedContent: fullEmail.forwardedContent || [],
       };
 
-      // Update UI
+      // Update UI immediately with what we have
       setSelectedEmail(emailToDisplay);
       
       // Mark as read in the UI
