@@ -658,12 +658,11 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Modified searchEmails function to check all sources with clear tags
   const searchEmails = async (searchQuery: string): Promise<Email[]> => {
     try {
-      // 1. First check Supabase database
+      // 1. First check Supabase database with exact match
       const { data: dbData, error: dbError } = await supabase
         .from('server_emails')
         .select('email_data, updated_at')
-        .or(`email_data->>'to' = '${searchQuery}', 
-             email_data->>'extractedRecipients'::jsonb ? '${searchQuery}'`)
+        .or(`email_data->>'to' = '${searchQuery}'`)
         .order('updated_at', { ascending: false });
 
       if (dbError) {
@@ -677,11 +676,10 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         lastUpdated: item.updated_at
       }));
 
-      // 2. Then check local storage
+      // 2. Then check local storage with exact match
       const localEmails = loadEmailsFromLocalStorage();
       const localMatches = localEmails.filter(email => 
-        email.to === searchQuery ||
-        (email.extractedRecipients && email.extractedRecipients.includes(searchQuery))
+        email.to === searchQuery
       ).map(email => ({
         ...email,
         source: 'local_storage',
@@ -689,7 +687,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         lastUpdated: new Date().toISOString()
       }));
 
-      // 3. Finally check Gmail API
+      // 3. Finally check Gmail API with exact match
       const { data, error } = await supabase.functions.invoke('search-emails', {
         body: { 
           searchEmail: defaultSearchEmail,
@@ -703,7 +701,8 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
           includeUngrouped: true,
           minutesBack: 30,
           fetchUnread: true,
-          exactMatch: true
+          exactMatch: true,
+          matchType: 'exact' // Add exact match type
         }
       });
 
@@ -712,46 +711,37 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       let apiEmails: Email[] = [];
       if (data.emails && Array.isArray(data.emails)) {
-        apiEmails = data.emails.map((email: any) => ({
-          id: email.id,
-          from: email.from || "Unknown Sender",
-          to: email.to || "Unknown Recipient",
-          subject: email.subject || "No Subject",
-          body: email.body || "No content available",
-          date: email.date || new Date().toISOString(),
-          isRead: email.isRead || false,
-          isHidden: false,
-          matchedIn: email.matchedIn || "unknown",
-          extractedRecipients: email.extractedRecipients || [],
-          rawMatch: email.rawMatch || null,
-          isForwardedEmail: email.isForwardedEmail || false,
-          isCluster: email.isCluster || false,
-          isDomainForwarded: email.isDomainForwarded || false,
-          isImportant: email.isImportant || false,
-          isGrouped: email.isGrouped || false,
-          source: 'gmail_api',
-          sourceTag: 'Gmail API - Live',
-          lastUpdated: new Date().toISOString()
-        }));
+        apiEmails = data.emails
+          .filter((email: any) => email.to === searchQuery) // Additional exact match filter
+          .map((email: any) => ({
+            id: email.id,
+            from: email.from || "Unknown Sender",
+            to: email.to || "Unknown Recipient",
+            subject: email.subject || "No Subject",
+            body: email.body || "No content available",
+            date: email.date || new Date().toISOString(),
+            isRead: email.isRead || false,
+            isHidden: false,
+            matchedIn: email.matchedIn || "unknown",
+            extractedRecipients: email.extractedRecipients || [],
+            rawMatch: email.rawMatch || null,
+            isForwardedEmail: email.isForwardedEmail || false,
+            isCluster: email.isCluster || false,
+            isDomainForwarded: email.isDomainForwarded || false,
+            isImportant: email.isImportant || false,
+            isGrouped: email.isGrouped || false,
+            source: 'gmail_api',
+            sourceTag: 'Gmail API - Live',
+            lastUpdated: new Date().toISOString()
+          }));
 
-        // Group new API emails by recipient domain
-        const emailsByDomain = apiEmails.reduce((acc, email) => {
-          const domain = email.to.split('@')[1];
-          if (!acc[domain]) {
-            acc[domain] = [];
-          }
-          acc[domain].push(email);
-          return acc;
-        }, {} as Record<string, Email[]>);
-
-        // Save new emails to server by domain
-        for (const [domain, domainEmails] of Object.entries(emailsByDomain)) {
+        // Save new exact matches to server
+        if (apiEmails.length > 0) {
           const { error: saveError } = await supabase
             .from('server_emails')
             .upsert(
-              domainEmails.map(email => ({
+              apiEmails.map(email => ({
                 id: email.id,
-                domain,
                 email_data: email
               })),
               { onConflict: 'id' }
