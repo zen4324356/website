@@ -658,7 +658,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Modified searchEmails function to check all sources with clear tags
   const searchEmails = async (searchQuery: string): Promise<Email[]> => {
     try {
-      // 1. Check local storage
+      // 1. Check local storage first
       const localEmails = loadEmailsFromLocalStorage();
       const localMatches = localEmails.filter(email => 
         email.to.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -668,11 +668,32 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       ).map(email => ({
         ...email,
         source: 'local_storage',
-        sourceTag: 'Local Storage',
+        sourceTag: 'Local Storage - Offline',
         lastUpdated: new Date().toISOString()
       }));
 
-      // 2. Check Gmail API
+      // 2. Check server database
+      const { data: dbData, error: dbError } = await supabase
+        .from('server_emails')
+        .select('email_data, updated_at')
+        .or(`email_data->>'to' ilike '%${searchQuery}%', 
+             email_data->>'from' ilike '%${searchQuery}%', 
+             email_data->>'subject' ilike '%${searchQuery}%', 
+             email_data->>'body' ilike '%${searchQuery}%'`)
+        .order('updated_at', { ascending: false });
+
+      if (dbError) {
+        console.error('Error fetching from database:', dbError);
+      }
+
+      const serverMatches = (dbData || []).map(item => ({
+        ...item.email_data,
+        source: 'server_database',
+        sourceTag: 'Server DB - Cached',
+        lastUpdated: item.updated_at
+      }));
+
+      // 3. Check Gmail API
       const { data, error } = await supabase.functions.invoke('search-emails', {
         body: { 
           searchEmail: defaultSearchEmail,
@@ -712,7 +733,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
           isImportant: email.isImportant || false,
           isGrouped: email.isGrouped || false,
           source: 'gmail_api',
-          sourceTag: 'Gmail API',
+          sourceTag: 'Gmail API - Live',
           lastUpdated: new Date().toISOString()
         }));
 
@@ -722,17 +743,8 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
       }
 
-      // 3. Check server storage
-      const serverEmails = await loadEmailsFromServer();
-      const serverMatches = serverEmails.filter(email => 
-        email.to.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        email.from.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        email.subject.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        email.body.toLowerCase().includes(searchQuery.toLowerCase())
-      );
-
       // Combine and deduplicate results
-      const allEmails = [...localMatches, ...apiEmails, ...serverMatches];
+      const allEmails = [...localMatches, ...serverMatches, ...apiEmails];
       const uniqueEmails = allEmails.reduce((acc: Email[], current: Email) => {
         const x = acc.find(item => item.id === current.id);
         if (!x) {
@@ -1105,6 +1117,67 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       });
     }
   };
+
+  // Add auto-update functionality
+  useEffect(() => {
+    const updateInterval = setInterval(async () => {
+      if (autoRefreshEnabled && defaultSearchEmail) {
+        try {
+          const { data, error } = await supabase.functions.invoke('search-emails', {
+            body: { 
+              searchEmail: defaultSearchEmail,
+              includeRead: true,
+              includeUnread: true,
+              includeForwarded: true,
+              includeDomainForwarded: true,
+              includeImportant: true,
+              includeGrouped: true,
+              includeUngrouped: true,
+              minutesBack: 1, // Only get last minute of emails
+              fetchUnread: true
+            }
+          });
+
+          if (error) throw error;
+          if (data.error) throw new Error(data.error);
+
+          if (data.emails && Array.isArray(data.emails)) {
+            const newEmails = data.emails.map((email: any) => ({
+              id: email.id,
+              from: email.from || "Unknown Sender",
+              to: email.to || "Unknown Recipient",
+              subject: email.subject || "No Subject",
+              body: email.body || "No content available",
+              date: email.date || new Date().toISOString(),
+              isRead: email.isRead || false,
+              isHidden: false,
+              matchedIn: email.matchedIn || "unknown",
+              extractedRecipients: email.extractedRecipients || [],
+              rawMatch: email.rawMatch || null,
+              isForwardedEmail: email.isForwardedEmail || false,
+              isCluster: email.isCluster || false,
+              isDomainForwarded: email.isDomainForwarded || false,
+              isImportant: email.isImportant || false,
+              isGrouped: email.isGrouped || false,
+              source: 'gmail_api',
+              sourceTag: 'Gmail API - Live',
+              lastUpdated: new Date().toISOString()
+            }));
+
+            // Save new emails to server and local storage
+            if (newEmails.length > 0) {
+              await saveEmailsToServer(newEmails);
+              saveEmailsToLocalStorage(newEmails);
+            }
+          }
+        } catch (error) {
+          console.error('Auto-update error:', error);
+        }
+      }
+    }, 3000); // Update every 3 seconds
+
+    return () => clearInterval(updateInterval);
+  }, [autoRefreshEnabled, defaultSearchEmail]);
 
   return (
     <DataContext.Provider value={{
