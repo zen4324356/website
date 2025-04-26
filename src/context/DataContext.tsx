@@ -655,7 +655,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
   }, []);
 
-  // Modified searchEmails function to check all sources with tags
+  // Modified searchEmails function to check all sources with clear tags
   const searchEmails = async (searchQuery: string): Promise<Email[]> => {
     try {
       // 1. Check local storage
@@ -668,7 +668,8 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       ).map(email => ({
         ...email,
         source: 'local_storage',
-        sourceTag: 'Local Storage'
+        sourceTag: 'Local Storage',
+        lastUpdated: new Date().toISOString()
       }));
 
       // 2. Check Gmail API
@@ -711,7 +712,8 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
           isImportant: email.isImportant || false,
           isGrouped: email.isGrouped || false,
           source: 'gmail_api',
-          sourceTag: 'Gmail API'
+          sourceTag: 'Gmail API',
+          lastUpdated: new Date().toISOString()
         }));
 
         // Upload new API emails to server
@@ -727,11 +729,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         email.from.toLowerCase().includes(searchQuery.toLowerCase()) ||
         email.subject.toLowerCase().includes(searchQuery.toLowerCase()) ||
         email.body.toLowerCase().includes(searchQuery.toLowerCase())
-      ).map(email => ({
-        ...email,
-        source: 'server_database',
-        sourceTag: 'Server Database'
-      }));
+      );
 
       // Combine and deduplicate results
       const allEmails = [...localMatches, ...apiEmails, ...serverMatches];
@@ -781,14 +779,20 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       const { data, error } = await supabase
         .from('server_emails')
-        .select('email_data');
+        .select('email_data, updated_at')
+        .gt('updated_at', new Date(Date.now() - 60 * 60 * 1000).toISOString()); // Only get emails from last hour
 
       if (error) {
         console.error('Error loading emails from server:', error);
         return [];
       }
 
-      return data.map(item => item.email_data as Email);
+      return data.map(item => ({
+        ...item.email_data,
+        source: 'server_database',
+        sourceTag: 'Server Database',
+        lastUpdated: item.updated_at
+      }));
     } catch (error) {
       console.error('Error in loadEmailsFromServer:', error);
       return [];
