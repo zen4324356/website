@@ -54,14 +54,23 @@ export const EmailView: React.FC<EmailViewProps> = ({
   };
 
   const cleanBody = (body: string) => {
+    if (!body) return '';
+    
     // Remove HTML tags
     let cleaned = body.replace(/<[^>]*>/g, '');
-    // Remove extra whitespace and special characters
-    cleaned = cleaned.replace(/\s+/g, ' ').trim();
+    
     // Remove non-printable characters and special symbols
     cleaned = cleaned.replace(/[\u0000-\u001F\u007F-\u009F\u00A0\u00AD\u2000-\u200F\u2028-\u202F\u205F-\u206F\u3000\uFEFF]/g, '');
+    
+    // Remove specific unwanted characters
+    cleaned = cleaned.replace(/Â/g, '');
+    
+    // Remove extra whitespace
+    cleaned = cleaned.replace(/\s+/g, ' ').trim();
+    
     // Remove any remaining special characters but keep basic punctuation
     cleaned = cleaned.replace(/[^\w\s.,!?-]/g, '');
+    
     return cleaned;
   };
 
@@ -71,12 +80,17 @@ export const EmailView: React.FC<EmailViewProps> = ({
         initial={{ x: 300, opacity: 0 }}
         animate={{ x: 0, opacity: 1 }}
         exit={{ x: 300, opacity: 0 }}
-        transition={{ duration: 0.3 }}
+        transition={{ duration: 0.3, ease: "easeInOut" }}
         className="fixed right-0 top-0 h-screen w-1/2 bg-white dark:bg-gray-800 shadow-lg rounded-l-lg overflow-hidden"
       >
         <div className="flex flex-col h-full">
           {/* Header */}
-          <div className="flex items-center justify-between p-4 border-b dark:border-gray-700">
+          <motion.div 
+            initial={{ y: -20, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            transition={{ delay: 0.2 }}
+            className="flex items-center justify-between p-4 border-b dark:border-gray-700"
+          >
             <div className="flex items-center space-x-2">
               <Button
                 variant="ghost"
@@ -135,7 +149,7 @@ export const EmailView: React.FC<EmailViewProps> = ({
                 <MoreVertical className="h-5 w-5" />
               </Button>
             </div>
-          </div>
+          </motion.div>
 
           {/* Email Content */}
           <div className="flex-1 overflow-y-auto p-6">
@@ -144,11 +158,16 @@ export const EmailView: React.FC<EmailViewProps> = ({
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -20 }}
-              transition={{ duration: 0.3 }}
+              transition={{ duration: 0.3, ease: "easeInOut" }}
               className="space-y-6"
             >
               {/* Email Header */}
-              <div className="space-y-2">
+              <motion.div 
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: 0.1 }}
+                className="space-y-2"
+              >
                 <div className="flex items-center justify-between">
                   <h3 className="text-xl font-semibold">{currentEmail.subject}</h3>
                   <div className="flex items-center space-x-2">
@@ -173,15 +192,25 @@ export const EmailView: React.FC<EmailViewProps> = ({
                 <div className="text-sm text-gray-500 dark:text-gray-400">
                   {formatDate(currentEmail.date)}
                 </div>
-              </div>
+              </motion.div>
 
               {/* Email Body */}
-              <div className="prose dark:prose-invert max-w-none">
+              <motion.div 
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.2 }}
+                className="prose dark:prose-invert max-w-none"
+              >
                 <p className="whitespace-pre-wrap">{cleanBody(currentEmail.body)}</p>
-              </div>
+              </motion.div>
 
               {/* Email Footer */}
-              <div className="flex flex-col items-center justify-center space-y-4 pt-4 border-t dark:border-gray-700">
+              <motion.div 
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.3 }}
+                className="flex flex-col items-center justify-center space-y-4 pt-4 border-t dark:border-gray-700"
+              >
                 <div className="flex items-center space-x-4">
                   <Button
                     variant="outline"
@@ -210,7 +239,7 @@ export const EmailView: React.FC<EmailViewProps> = ({
                 <div className="text-sm text-gray-500 dark:text-gray-400">
                   Source: {currentEmail.matchedIn || 'Unknown'}
                 </div>
-              </div>
+              </motion.div>
             </motion.div>
           </div>
         </div>
