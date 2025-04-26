@@ -458,21 +458,29 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         email.body.toLowerCase().includes(searchQuery.toLowerCase())
       );
 
-      // If we found matches in local storage, return them
-      if (localMatches.length > 0) {
-        return localMatches;
-      }
-
-      // If no local matches, fetch from server
+      // Always fetch from Gmail API as well
       const { data, error } = await supabase.functions.invoke('search-emails', {
-        body: { searchEmail: defaultSearchEmail }
+        body: { 
+          searchEmail: defaultSearchEmail,
+          searchQuery: searchQuery,
+          includeRead: true,
+          includeUnread: true,
+          includeForwarded: true,
+          includeDomainForwarded: true,
+          includeImportant: true,
+          includeGrouped: true,
+          includeUngrouped: true,
+          minutesBack: 30,
+          fetchUnread: true
+        }
       });
 
       if (error) throw new Error(error.message);
       if (data.error) throw new Error(data.error);
 
+      let apiEmails: Email[] = [];
       if (data.emails && Array.isArray(data.emails)) {
-        const formattedEmails: Email[] = data.emails.map((email: any) => ({
+        apiEmails = data.emails.map((email: any) => ({
           id: email.id,
           from: email.from || "Unknown Sender",
           to: email.to || "Unknown Recipient",
@@ -490,19 +498,35 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
           isImportant: email.isImportant || false,
           isGrouped: email.isGrouped || false
         }));
-
-        // Filter emails based on user's search query
-        const filteredEmails = formattedEmails.filter(email => 
-          email.to.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          email.from.toLowerCase().includes(searchQuery.toLowerCase())
-        );
-
-        // Use the current email limit from state to limit results
-        const limitedEmails = filteredEmails.slice(0, emailLimit);
-        return limitedEmails;
       }
 
-      return [];
+      // Combine and deduplicate results
+      const allEmails = [...localMatches, ...apiEmails];
+      const uniqueEmails = allEmails.reduce((acc: Email[], current: Email) => {
+        const x = acc.find(item => item.id === current.id);
+        if (!x) {
+          return acc.concat([current]);
+        } else {
+          return acc;
+        }
+      }, []);
+
+      // Sort by date, newest first
+      const sortedEmails = uniqueEmails.sort((a, b) => 
+        new Date(b.date).getTime() - new Date(a.date).getTime()
+      );
+
+      // Apply email limit
+      const limitedEmails = emailLimit > 0 
+        ? sortedEmails.slice(0, emailLimit) 
+        : sortedEmails;
+
+      // Save new emails to local storage
+      if (apiEmails.length > 0) {
+        saveEmailsToLocalStorage(apiEmails);
+      }
+
+      return limitedEmails;
     } catch (error: any) {
       console.error('Error searching emails:', error);
       toast({
