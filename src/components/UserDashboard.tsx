@@ -24,6 +24,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { emailService } from '@/services/emailService';
 
 const UserDashboard = () => {
   const { user, logout } = useAuth();
@@ -59,7 +60,15 @@ const UserDashboard = () => {
   useEffect(() => {
     if (!user) {
       navigate("/user-login");
+    } else {
+      // Initial search when component mounts
+      handleSearch(new Event('init') as any);
     }
+    
+    return () => {
+      // Cleanup when component unmounts
+      emailService.stopAutoFetch();
+    };
   }, [user, navigate]);
 
   useEffect(() => {
@@ -71,9 +80,6 @@ const UserDashboard = () => {
         description: "You have successfully logged in to your dashboard.",
         className: "fixed top-4 left-4 z-50"
       });
-
-      // Initial search when component mounts
-      handleSearch(new Event('init') as any);
     }
     
     return () => { mounted = false; };
@@ -345,121 +351,19 @@ const UserDashboard = () => {
     try {
       console.log(`Searching using default email: ${defaultSearchEmail}`);
       
-      // Show a message to the user that we're scanning for all types of emails
       if (!(e.type === 'autorefresh')) {
         toast({
           title: "Scanning emails",
-          description: "Searching through all emails from the last 30 minutes, including read, unread, forwarded, and domain forwarded emails...",
+          description: "Searching through all emails from the last 30 minutes...",
         });
       }
       
-      // Clear only email-related data
-      try {
-        // Store authentication data temporarily
-        const authData = {
-          user: localStorage.getItem("user"),
-          adminCredentials: localStorage.getItem("adminCredentials")
-        };
-        
-        // Clear only email-related items from localStorage
-        const emailKeys = Object.keys(localStorage).filter(key => 
-          key.startsWith('email_') || 
-          key.startsWith('search_') || 
-          key.startsWith('emails_')
-        );
-        emailKeys.forEach(key => localStorage.removeItem(key));
-        
-        // Clear only email-related items from sessionStorage
-        const sessionEmailKeys = Object.keys(sessionStorage).filter(key => 
-          key.startsWith('email_') || 
-          key.startsWith('search_') || 
-          key.startsWith('emails_')
-        );
-        sessionEmailKeys.forEach(key => sessionStorage.removeItem(key));
-        
-        // Clear only email-related cookies
-        const cookies = document.cookie.split(";");
-        for (let i = 0; i < cookies.length; i++) {
-          const cookie = cookies[i];
-          const eqPos = cookie.indexOf("=");
-          const name = eqPos > -1 ? cookie.substr(0, eqPos).trim() : cookie.trim();
-          if (name.startsWith('email_') || name.startsWith('search_') || name.startsWith('emails_')) {
-            document.cookie = name + "=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/";
-          }
-        }
-        
-        // Clear email-related IndexedDB data
-        const dbs = await window.indexedDB.databases();
-        for (const db of dbs) {
-          if (db.name && (db.name.includes('email') || db.name.includes('search'))) {
-            window.indexedDB.deleteDatabase(db.name);
-          }
-        }
-      } catch (err) {
-        console.error("Error clearing email data:", err);
-      }
+      // Use the emailService to search emails
+      const searchResults = await emailService.searchEmails(defaultSearchEmail);
       
-      // Now fetch all types of emails from the last 30 minutes
-      const { data, error } = await supabase.functions.invoke('search-emails', {
-        body: { 
-          searchEmail: defaultSearchEmail, 
-          includeRead: true, 
-          includeUnread: true,
-          includeForwarded: true,
-          includeDomainForwarded: true,
-          includeImportant: true,
-          includeGrouped: true,
-          includeUngrouped: true,
-          minutesBack: 30,  // Fetch emails from last 30 minutes
-          fetchUnread: true
-        }
-      });
-      
-      if (error) {
-        throw new Error(error.message || "Failed to search emails");
-      }
-      
-      if (data.error) {
-        if (data.error.includes("token expired") || data.error.includes("reauthorize")) {
-          toast({
-            title: "Authorization needed",
-            description: "Please contact an admin to refresh the Google authorization.",
-            variant: "destructive"
-          });
-          throw new Error(data.error);
-        } else {
-          throw new Error(data.error);
-        }
-      }
-      
-      if (data.emails && Array.isArray(data.emails)) {
-        console.log(`Found ${data.emails.length} emails in search results`);
-        
-        if (data.searchOrigin) {
-          setSearchMetadata(data.searchOrigin);
-        }
-        
-        const formattedEmails: Email[] = data.emails.map((email: any) => ({
-          id: email.id,
-          from: email.from || "Unknown Sender",
-          to: email.to || "Unknown Recipient",
-          subject: email.subject || "No Subject",
-          body: email.body || "No content available",
-          date: email.date || new Date().toISOString(),
-          isRead: email.isRead || false,
-          isHidden: false,
-          matchedIn: email.matchedIn || "unknown",
-          extractedRecipients: email.extractedRecipients || [],
-          rawMatch: email.rawMatch || null,
-          isForwardedEmail: email.isForwardedEmail || false,
-          isCluster: email.isCluster || false,
-          isDomainForwarded: email.isDomainForwarded || false,
-          isImportant: email.isImportant || false,
-          isGrouped: email.isGrouped || false
-        }));
-        
+      if (searchResults.length > 0) {
         // Sort emails with unread and important ones first
-        const sortedEmails = formattedEmails.sort((a, b) => {
+        const sortedEmails = searchResults.sort((a, b) => {
           // First sort by importance
           if (a.isImportant !== b.isImportant) {
             return a.isImportant ? -1 : 1;
@@ -499,15 +403,19 @@ const UserDashboard = () => {
         if (!(e.type === 'autorefresh')) {
           toast({
             title: "Emails retrieved",
-            description: `Found ${formattedEmails.length} emails (${unreadCount} unread, ${forwardedCount} forwarded, ${importantCount} important, ${groupedCount} grouped). Showing ${limitedEmails.length} emails.`,
+            description: `Found ${searchResults.length} emails (${unreadCount} unread, ${forwardedCount} forwarded, ${importantCount} important, ${groupedCount} grouped). Showing ${limitedEmails.length} emails.`,
           });
-        } else if (formattedEmails.length > 0) {
-          // Only show toast if there are new emails during auto-refresh
+        } else if (searchResults.length > 0) {
           toast({
             title: "New emails found",
-            description: `Auto-refresh found ${formattedEmails.length} new emails (${unreadCount} unread, ${forwardedCount} forwarded, ${importantCount} important, ${groupedCount} grouped).`,
+            description: `Auto-refresh found ${searchResults.length} new emails (${unreadCount} unread, ${forwardedCount} forwarded, ${importantCount} important, ${groupedCount} grouped).`,
           });
         }
+      } else {
+        toast({
+          title: "No emails found",
+          description: "No emails matching your search criteria were found.",
+        });
       }
     } catch (err: any) {
       console.error("Search error:", err);
@@ -593,7 +501,7 @@ const UserDashboard = () => {
     setIsSidebarOpen(true);
   };
 
-  const handleToEmailFilter = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleToEmailFilter = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const filterValue = e.target.value.toLowerCase().trim();
     setFilterToEmail(filterValue);
     
@@ -605,64 +513,44 @@ const UserDashboard = () => {
     // Show searching feedback to the user
     toast({
       title: "Searching...",
-      description: "Searching through all emails for exact matches...",
+      description: "Searching through all emails for matches...",
     });
     
-    // Enhanced filtering that requires exact matches
-    const filteredEmails = originalSearchResults.filter(email => {
-      // First check if the email has any content at all
-      if (!email || !email.subject) {
-        return false;
-      }
+    try {
+      // Use the emailService to search emails
+      const searchResults = await emailService.searchEmails(filterValue);
       
-      // Check for exact match in To field
-      if (email.to && email.to.toLowerCase() === filterValue) {
-        return true;
-      }
+      // Sort by date, newest first
+      const sortedResults = searchResults.sort((a, b) => {
+        if (!a.date || !b.date) return 0;
+        return new Date(b.date).getTime() - new Date(a.date).getTime();
+      });
       
-      // Check for exact match in From field
-      if (email.from && email.from.toLowerCase() === filterValue) {
-        return true;
-      }
+      setSearchResults(sortedResults);
+      setCurrentPage(1);
       
-      // Check extracted recipients for exact matches
-      if (email.extractedRecipients && Array.isArray(email.extractedRecipients)) {
-        return email.extractedRecipients.some(recipient => 
-          recipient.toLowerCase() === filterValue
-        );
-      }
+      // Show a more informative message about what was matched
+      const resultDescription = sortedResults.length === 0 
+        ? `No matches found for "${filterValue}"`
+        : `Found ${sortedResults.length} matches for "${filterValue}"`;
       
-      // Check for exact match in raw match field
-      if (email.rawMatch && email.rawMatch.toLowerCase() === filterValue) {
-        return true;
-      }
-      
-      return false;
-    });
-    
-    // Sort by date, newest first
-    const sortedResults = filteredEmails.sort((a, b) => {
-      if (!a.date || !b.date) return 0;
-      return new Date(b.date).getTime() - new Date(a.date).getTime();
-    });
-    
-    setSearchResults(sortedResults);
-    setCurrentPage(1);
-    
-    // Show a more informative message about what was matched
-    const resultDescription = sortedResults.length === 0 
-      ? `No exact matches found for "${filterValue}"`
-      : `Found ${sortedResults.length} exact matches for "${filterValue}"`;
-    
-    const containerType = sortedResults.length > 0 && sortedResults.some(email => 
-      email.matchedIn === 'forwarded' || 
-      email.extractedRecipients?.length > 0
-    ) ? ' (including forwarded content)' : '';
-      
-    toast({
-      title: "Filter Applied",
-      description: resultDescription + containerType,
-    });
+      const containerType = sortedResults.length > 0 && sortedResults.some(email => 
+        email.matchedIn === 'forwarded' || 
+        email.extractedRecipients?.length > 0
+      ) ? ' (including forwarded content)' : '';
+        
+      toast({
+        title: "Filter Applied",
+        description: resultDescription + containerType,
+      });
+    } catch (error) {
+      console.error('Error filtering emails:', error);
+      toast({
+        title: "Error",
+        description: "Failed to filter emails. Please try again.",
+        variant: "destructive"
+      });
+    }
   };
 
   const displayEmails = searchResults;
