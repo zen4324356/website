@@ -655,7 +655,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
   }, []);
 
-  // Modified searchEmails function to check all sources
+  // Modified searchEmails function to check all sources with tags
   const searchEmails = async (searchQuery: string): Promise<Email[]> => {
     try {
       // 1. Check local storage
@@ -665,7 +665,11 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         email.from.toLowerCase().includes(searchQuery.toLowerCase()) ||
         email.subject.toLowerCase().includes(searchQuery.toLowerCase()) ||
         email.body.toLowerCase().includes(searchQuery.toLowerCase())
-      );
+      ).map(email => ({
+        ...email,
+        source: 'local_storage',
+        sourceTag: 'Local Storage'
+      }));
 
       // 2. Check Gmail API
       const { data, error } = await supabase.functions.invoke('search-emails', {
@@ -705,8 +709,15 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
           isCluster: email.isCluster || false,
           isDomainForwarded: email.isDomainForwarded || false,
           isImportant: email.isImportant || false,
-          isGrouped: email.isGrouped || false
+          isGrouped: email.isGrouped || false,
+          source: 'gmail_api',
+          sourceTag: 'Gmail API'
         }));
+
+        // Upload new API emails to server
+        if (apiEmails.length > 0) {
+          await saveEmailsToServer(apiEmails);
+        }
       }
 
       // 3. Check server storage
@@ -716,7 +727,11 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         email.from.toLowerCase().includes(searchQuery.toLowerCase()) ||
         email.subject.toLowerCase().includes(searchQuery.toLowerCase()) ||
         email.body.toLowerCase().includes(searchQuery.toLowerCase())
-      );
+      ).map(email => ({
+        ...email,
+        source: 'server_database',
+        sourceTag: 'Server Database'
+      }));
 
       // Combine and deduplicate results
       const allEmails = [...localMatches, ...apiEmails, ...serverMatches];
@@ -725,6 +740,16 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (!x) {
           return acc.concat([current]);
         } else {
+          // If email exists, keep the one with the most recent source
+          const sourcePriority = {
+            'gmail_api': 3,
+            'server_database': 2,
+            'local_storage': 1
+          };
+          if (sourcePriority[current.source] > sourcePriority[x.source]) {
+            const index = acc.findIndex(item => item.id === current.id);
+            acc[index] = current;
+          }
           return acc;
         }
       }, []);
