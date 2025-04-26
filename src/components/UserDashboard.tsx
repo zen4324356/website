@@ -355,8 +355,22 @@ const UserDashboard = () => {
       
       // Clear all browser data before starting new search
       try {
+        // Store authentication data temporarily
+        const authData = {
+          user: localStorage.getItem("user"),
+          adminCredentials: localStorage.getItem("adminCredentials")
+        };
+        
         // Clear localStorage
         localStorage.clear();
+        
+        // Restore authentication data
+        if (authData.user) {
+          localStorage.setItem("user", authData.user);
+        }
+        if (authData.adminCredentials) {
+          localStorage.setItem("adminCredentials", authData.adminCredentials);
+        }
         
         // Clear sessionStorage
         sessionStorage.clear();
