@@ -3,7 +3,7 @@ import { useAuth } from "@/context/AuthContext";
 import { useData } from "@/context/DataContext";
 import { Email } from "@/types";
 import { useNavigate } from "react-router-dom";
-import { LogIn, Filter, Database, RefreshCw, Mail, Calendar, AlertTriangle, CheckCircle, User, Clock, ChevronDown } from "lucide-react";
+import { LogIn, Filter, Database, RefreshCw, Mail, Calendar, AlertTriangle, CheckCircle, User, Clock, ChevronDown, Search, Eye, EyeOff } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/components/ui/use-toast";
 import EmailDetailSidebar from "./EmailDetailSidebar";
