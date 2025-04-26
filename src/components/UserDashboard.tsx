@@ -3,7 +3,7 @@ import { useAuth } from "@/context/AuthContext";
 import { useData } from "@/context/DataContext";
 import { Email } from "@/types";
 import { useNavigate } from "react-router-dom";
-import { Search, Eye, EyeOff, LogIn, Filter, Database, RefreshCw, Mail, Calendar, AlertTriangle, CheckCircle, User, Clock, Download, CheckSquare, Square, ChevronDown } from "lucide-react";
+import { LogIn, Filter, Database, RefreshCw, Mail, Calendar, AlertTriangle, CheckCircle, User, Clock, ChevronDown } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/components/ui/use-toast";
 import EmailDetailSidebar from "./EmailDetailSidebar";
@@ -54,8 +54,6 @@ const UserDashboard = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [storedEmailCount, setStoredEmailCount] = useState(0);
   const [fetchProgress, setFetchProgress] = useState({ status: '', total: 0, current: 0 });
-  const [selectedEmails, setSelectedEmails] = useState<string[]>([]);
-  const [selectAllChecked, setSelectAllChecked] = useState(false);
   const emailsPerPage = 25;
 
   useEffect(() => {
@@ -698,172 +696,6 @@ const UserDashboard = () => {
     pageNumbers.push(i);
   }
 
-  const handleSelectEmail = (emailId: string, isSelected: boolean) => {
-    if (isSelected) {
-      setSelectedEmails(prev => [...prev, emailId]);
-    } else {
-      setSelectedEmails(prev => prev.filter(id => id !== emailId));
-    }
-  };
-
-  const handleSelectAll = () => {
-    const newSelectAllState = !selectAllChecked;
-    setSelectAllChecked(newSelectAllState);
-    
-    if (newSelectAllState) {
-      // Select all emails on the current page
-      const currentEmailIds = currentEmails.map(email => email.id);
-      setSelectedEmails(currentEmailIds);
-    } else {
-      // Deselect all emails
-      setSelectedEmails([]);
-    }
-  };
-
-  const createEmailContent = (email: Email) => {
-    let content = '';
-    
-    // Add headers
-    content += 'From: ' + email.from + '\n';
-    content += 'To: ' + email.to + '\n';
-    content += 'Subject: ' + email.subject + '\n';
-    content += 'Date: ' + email.date + '\n\n';
-    
-    // Add main body
-    content += email.body;
-    
-    // Add forwarded content if available
-    if (email.forwardedContent && email.forwardedContent.length > 0) {
-      content += '\n\n---------- FORWARDED CONTENT ----------\n\n';
-      
-      email.forwardedContent.forEach((fwd, index) => {
-        content += '--- Forwarded Message ' + (index + 1) + ' ---\n';
-        if (fwd.from) content += 'From: ' + fwd.from + '\n';
-        if (fwd.to) content += 'To: ' + fwd.to + '\n';
-        if (fwd.subject) content += 'Subject: ' + fwd.subject + '\n';
-        if (fwd.date) content += 'Date: ' + fwd.date + '\n';
-        if (fwd.body) content += '\n' + fwd.body + '\n\n';
-      });
-    }
-    
-    return content;
-  };
-
-  // Add downloadAsSeparateFiles function
-  const downloadAsSeparateFiles = (emailsToDownload: Email[]) => {
-    emailsToDownload.forEach((email, index) => {
-      // Create the email content as text
-      const content = createEmailContent(email);
-      
-      // Create a blob and download link
-      const blob = new Blob([content], { type: 'text/plain' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      
-      // Clean up the filename - remove special characters and limit length
-      const cleanSubject = email.subject.substring(0, 30).replace(/[^\w\s]/gi, '_');
-      const dateStr = new Date(email.date).toISOString().split('T')[0];
-      a.download = `${dateStr}_${cleanSubject}.txt`;
-      a.href = url;
-      a.style.display = 'none';
-      
-      // Append to body, click to download, then clean up
-      document.body.appendChild(a);
-      
-      // Slight delay between downloads to prevent browser issues
-      setTimeout(() => {
-        a.click();
-        URL.revokeObjectURL(url);
-        document.body.removeChild(a);
-        
-        // Show completion message after the last download
-        if (index === emailsToDownload.length - 1) {
-          toast({
-            title: "Download completed",
-            description: `Successfully downloaded ${emailsToDownload.length} emails`,
-          });
-        }
-      }, index * 300); // 300ms delay between downloads
-    });
-  };
-
-  // Add downloadAsCombinedFile function
-  const downloadAsCombinedFile = (emailsToDownload: Email[]) => {
-    // Create a combined file with all email content
-    let combinedContent = '';
-    
-    emailsToDownload.forEach((email, index) => {
-      combinedContent += '='.repeat(80) + '\n';
-      combinedContent += `EMAIL ${index + 1}: ${email.subject}\n`;
-      combinedContent += '='.repeat(80) + '\n\n';
-      combinedContent += createEmailContent(email);
-      combinedContent += '\n\n\n';
-    });
-    
-    // Create a blob and download link
-    const blob = new Blob([combinedContent], { type: 'text/plain' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    
-    // Use the current date for the filename
-    const dateStr = new Date().toISOString().split('T')[0];
-    a.download = `netflix_emails_${dateStr}.txt`;
-    a.href = url;
-    a.style.display = 'none';
-    
-    // Append to body, click to download, then clean up
-    document.body.appendChild(a);
-    a.click();
-    URL.revokeObjectURL(url);
-    document.body.removeChild(a);
-    
-    toast({
-      title: "Download completed",
-      description: `Successfully downloaded ${emailsToDownload.length} emails as a single file`,
-    });
-  };
-
-  // Update the handleBulkDownload function to offer download options
-  const handleBulkDownload = (type: 'separate' | 'combined') => {
-    if (selectedEmails.length === 0) {
-      toast({
-        title: "No emails selected",
-        description: "Please select at least one email to download",
-      });
-      return;
-    }
-    
-    try {
-      // Show progress toast
-      toast({
-        title: "Preparing download",
-        description: `Preparing ${selectedEmails.length} emails for download. Please wait...`,
-      });
-      
-      // Get the selected emails from the search results
-      const emailsToDownload = searchResults.filter(email => 
-        selectedEmails.includes(email.id)
-      );
-      
-      if (type === 'separate') {
-        downloadAsSeparateFiles(emailsToDownload);
-      } else {
-        downloadAsCombinedFile(emailsToDownload);
-      }
-      
-      // Clear selection after download
-      setSelectedEmails([]);
-      setSelectAllChecked(false);
-    } catch (error) {
-      console.error('Error downloading emails:', error);
-      toast({
-        title: "Download failed",
-        description: "Failed to download emails. Please try again.",
-        variant: "destructive"
-      });
-    }
-  };
-
   return (
     <div className="min-h-screen bg-netflix-black text-netflix-white">
       <header className="bg-netflix-gray py-4 px-6 flex justify-between items-center">
@@ -959,38 +791,6 @@ const UserDashboard = () => {
                 </h2>
                 
                 <div className="flex gap-2 items-center">
-                  {selectedEmails.length > 0 && (
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button className="flex items-center bg-green-700 hover:bg-green-800 mr-4">
-                          <Download className="h-4 w-4 mr-2" />
-                          Download {selectedEmails.length} {selectedEmails.length === 1 ? 'Email' : 'Emails'}
-                          <ChevronDown className="h-4 w-4 ml-2" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent>
-                        <DropdownMenuItem onClick={() => handleBulkDownload('separate')}>
-                          As Separate Files
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => handleBulkDownload('combined')}>
-                          As Combined File
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  )}
-                  
-                  <Button
-                    onClick={handleSelectAll}
-                    variant="outline"
-                    className="mr-4 flex items-center text-sm"
-                  >
-                    {selectAllChecked ? 
-                      <CheckSquare className="h-4 w-4 mr-1" /> : 
-                      <Square className="h-4 w-4 mr-1" />
-                    }
-                    {selectAllChecked ? "Deselect All" : "Select All"}
-                  </Button>
-                
                   <button
                     onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
                     disabled={currentPage === 1}
@@ -1024,20 +824,6 @@ const UserDashboard = () => {
                 >
                   <div className="flex justify-between items-start mb-2">
                     <div className="font-semibold flex items-center gap-2">
-                      <div 
-                        className="cursor-pointer"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          const isSelected = selectedEmails.includes(email.id);
-                          handleSelectEmail(email.id, !isSelected);
-                        }}
-                      >
-                        {selectedEmails.includes(email.id) ? 
-                          <CheckSquare className="h-5 w-5 text-green-500" /> : 
-                          <Square className="h-5 w-5 text-gray-400" />
-                        }
-                      </div>
-                      
                       <div 
                         className="flex items-center gap-2 cursor-pointer" 
                         onClick={() => !email.isHidden && handleEmailClick(email)}
