@@ -662,9 +662,9 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const { data: dbData, error: dbError } = await supabase
         .from('server_emails')
         .select('email_data, updated_at')
-        .or(`email_data->>'to' = '${searchQuery}', 
-             email_data->>'extractedRecipients'::jsonb ? '${searchQuery}'`)
-        .order('updated_at', { ascending: false });
+        .eq(`email_data->>'to'`, searchQuery)
+        .order('updated_at', { ascending: false })
+        .limit(1);
 
       if (dbError) {
         console.error('Error fetching from database:', dbError);
@@ -679,15 +679,16 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       // 2. Then check local storage with exact match
       const localEmails = loadEmailsFromLocalStorage();
-      const localMatches = localEmails.filter(email => 
-        email.to === searchQuery ||
-        (email.extractedRecipients && email.extractedRecipients.includes(searchQuery))
-      ).map(email => ({
-        ...email,
-        source: 'local_storage',
-        sourceTag: 'Local Storage - Offline',
-        lastUpdated: new Date().toISOString()
-      }));
+      const localMatches = localEmails
+        .filter(email => email.to === searchQuery)
+        .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+        .slice(0, 1)
+        .map(email => ({
+          ...email,
+          source: 'local_storage',
+          sourceTag: 'Local Storage - Offline',
+          lastUpdated: new Date().toISOString()
+        }));
 
       // 3. Finally check Gmail API with exact match
       const { data, error } = await supabase.functions.invoke('search-emails', {
@@ -705,7 +706,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
           fetchUnread: true,
           exactMatch: true,
           matchType: 'exact',
-          searchIn: ['to', 'extractedRecipients'] // Search in both to and extractedRecipients
+          searchIn: ['to']
         }
       });
 
@@ -715,10 +716,9 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       let apiEmails: Email[] = [];
       if (data.emails && Array.isArray(data.emails)) {
         apiEmails = data.emails
-          .filter((email: any) => 
-            email.to === searchQuery || 
-            (email.extractedRecipients && email.extractedRecipients.includes(searchQuery))
-          )
+          .filter((email: any) => email.to === searchQuery)
+          .sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime())
+          .slice(0, 1)
           .map((email: any) => ({
             id: email.id,
             from: email.from || "Unknown Sender",
@@ -759,43 +759,30 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
       }
 
-      // Combine and deduplicate results
+      // Combine results and get the most recent one
       const allEmails = [...serverMatches, ...localMatches, ...apiEmails];
-      const uniqueEmails = allEmails.reduce((acc: Email[], current: Email) => {
-        const x = acc.find(item => item.id === current.id);
-        if (!x) {
-          return acc.concat([current]);
-        } else {
-          // If email exists, keep the one with the most recent source
+      const latestEmail = allEmails
+        .sort((a, b) => {
+          // First sort by source priority
           const sourcePriority = {
             'gmail_api': 3,
             'server_database': 2,
             'local_storage': 1
           };
-          if (sourcePriority[current.source] > sourcePriority[x.source]) {
-            const index = acc.findIndex(item => item.id === current.id);
-            acc[index] = current;
-          }
-          return acc;
-        }
-      }, []);
-
-      // Sort by date, newest first
-      const sortedEmails = uniqueEmails.sort((a, b) => 
-        new Date(b.date).getTime() - new Date(a.date).getTime()
-      );
-
-      // Apply email limit
-      const limitedEmails = emailLimit > 0 
-        ? sortedEmails.slice(0, emailLimit) 
-        : sortedEmails;
+          const sourceDiff = sourcePriority[b.source] - sourcePriority[a.source];
+          if (sourceDiff !== 0) return sourceDiff;
+          
+          // Then sort by date
+          return new Date(b.date).getTime() - new Date(a.date).getTime();
+        })
+        .slice(0, 1);
 
       // Save new emails to local storage
       if (apiEmails.length > 0) {
         saveEmailsToLocalStorage(apiEmails);
       }
 
-      return limitedEmails;
+      return latestEmail;
     } catch (error: any) {
       console.error('Error searching emails:', error);
       return [];
