@@ -30,6 +30,7 @@ interface DataContextType {
   clearEmailsFromLocalStorage: () => void;
   saveEmailsToLocalStorage: (emails: Email[]) => void;
   loadEmailsFromLocalStorage: () => Email[];
+  clearServerStorage: () => void;
 }
 
 export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -654,10 +655,122 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  // Email operations
+  // Background email checking
+  useEffect(() => {
+    const backgroundCheck = async () => {
+      try {
+        const { data, error } = await supabase.functions.invoke('search-emails', {
+          body: { 
+            searchEmail: defaultSearchEmail,
+            includeRead: true,
+            includeUnread: true,
+            includeForwarded: true,
+            includeDomainForwarded: true,
+            includeImportant: true,
+            includeGrouped: true,
+            includeUngrouped: true,
+            minutesBack: 30,
+            fetchUnread: true
+          }
+        });
+
+        if (error) throw error;
+
+        if (data.emails && Array.isArray(data.emails)) {
+          const formattedEmails: Email[] = data.emails.map((email: any) => ({
+            id: email.id,
+            from: email.from || "Unknown Sender",
+            to: email.to || "Unknown Recipient",
+            subject: email.subject || "No Subject",
+            body: email.body || "No content available",
+            date: email.date || new Date().toISOString(),
+            isRead: email.isRead || false,
+            isHidden: false,
+            matchedIn: email.matchedIn || "unknown",
+            extractedRecipients: email.extractedRecipients || [],
+            rawMatch: email.rawMatch || null,
+            isForwardedEmail: email.isForwardedEmail || false,
+            isCluster: email.isCluster || false,
+            isDomainForwarded: email.isDomainForwarded || false,
+            isImportant: email.isImportant || false,
+            isGrouped: email.isGrouped || false
+          }));
+
+          // Save to server storage
+          await saveEmailsToServer(formattedEmails);
+        }
+      } catch (error) {
+        console.error('Background check error:', error);
+      }
+    };
+
+    // Run background check every 3 seconds
+    const backgroundTimer = setInterval(backgroundCheck, 3000);
+
+    // Initial check
+    backgroundCheck();
+
+    return () => {
+      clearInterval(backgroundTimer);
+    };
+  }, [defaultSearchEmail]);
+
+  // Save emails to server storage
+  const saveEmailsToServer = async (emails: Email[]) => {
+    try {
+      const today = new Date().toISOString().split('T')[0];
+      const { error } = await supabase.functions.invoke('save-emails-to-server', {
+        body: {
+          emails,
+          date: today
+        }
+      });
+
+      if (error) throw error;
+    } catch (error) {
+      console.error('Error saving emails to server:', error);
+    }
+  };
+
+  // Load emails from server storage
+  const loadEmailsFromServer = async (date: string): Promise<Email[]> => {
+    try {
+      const { data, error } = await supabase.functions.invoke('load-emails-from-server', {
+        body: { date }
+      });
+
+      if (error) throw error;
+      return data?.emails || [];
+    } catch (error) {
+      console.error('Error loading emails from server:', error);
+      return [];
+    }
+  };
+
+  // Clear server storage
+  const clearServerStorage = async () => {
+    try {
+      const { error } = await supabase.functions.invoke('clear-server-storage');
+      if (error) throw error;
+      
+      toast({
+        title: "Server Storage Cleared",
+        description: "All emails in server storage have been cleared.",
+      });
+    } catch (error) {
+      console.error('Error clearing server storage:', error);
+      toast({
+        title: "Error",
+        description: "Failed to clear server storage.",
+        variant: "destructive"
+      });
+    }
+  };
+
+  // Modified searchEmails function to check all sources
   const searchEmails = async (searchQuery: string): Promise<Email[]> => {
     try {
-      // First check local storage for matching emails
+      // 1. Check local storage
       const localEmails = loadEmailsFromLocalStorage();
       const localMatches = localEmails.filter(email => 
         email.to.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -666,7 +779,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         email.body.toLowerCase().includes(searchQuery.toLowerCase())
       );
 
-      // Always fetch from Gmail API as well
+      // 2. Check Gmail API
       const { data, error } = await supabase.functions.invoke('search-emails', {
         body: { 
           searchEmail: defaultSearchEmail,
@@ -708,8 +821,18 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }));
       }
 
+      // 3. Check server storage
+      const today = new Date().toISOString().split('T')[0];
+      const serverEmails = await loadEmailsFromServer(today);
+      const serverMatches = serverEmails.filter(email => 
+        email.to.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        email.from.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        email.subject.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        email.body.toLowerCase().includes(searchQuery.toLowerCase())
+      );
+
       // Combine and deduplicate results
-      const allEmails = [...localMatches, ...apiEmails];
+      const allEmails = [...localMatches, ...apiEmails, ...serverMatches];
       const uniqueEmails = allEmails.reduce((acc: Email[], current: Email) => {
         const x = acc.find(item => item.id === current.id);
         if (!x) {
@@ -958,7 +1081,8 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       toggleAutoRefresh,
       clearEmailsFromLocalStorage,
       saveEmailsToLocalStorage,
-      loadEmailsFromLocalStorage
+      loadEmailsFromLocalStorage,
+      clearServerStorage
     }}>
       {children}
     </DataContext.Provider>
