@@ -1,6 +1,3 @@
--- Enable UUID extension
-CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
-
 -- Create tables for admin settings
 CREATE TABLE IF NOT EXISTS admin_settings (
     id UUID DEFAULT gen_random_uuid() PRIMARY KEY,

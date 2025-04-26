@@ -216,7 +216,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         title: "Error",
         description: "Failed to update auto-refresh interval",
         variant: "destructive"
-      });
+    });
     }
   };
 
@@ -231,7 +231,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       if (error) throw error;
 
-      setAutoRefreshEnabled(enabled);
+    setAutoRefreshEnabled(enabled);
     toast({
         title: "Success",
         description: `Auto-refresh ${enabled ? 'enabled' : 'disabled'}`,
@@ -242,7 +242,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         title: "Error",
         description: "Failed to toggle auto-refresh",
         variant: "destructive"
-      });
+    });
     }
   };
 
@@ -299,7 +299,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         title: "Error",
         description: "Failed to update email limit",
         variant: "destructive"
-      });
+    });
     }
   };
 
@@ -333,7 +333,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         title: "Error",
         description: "Failed to update default search email",
         variant: "destructive"
-      });
+    });
     }
   };
 
@@ -616,42 +616,22 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const { data, error } = await supabase
         .from('server_storage_stats')
         .select('*')
-        .order('created_at', { ascending: false })
-        .limit(1)
         .single();
 
-      if (error) {
-        console.error('Error getting server storage stats:', error);
-        return;
-      }
-
-      if (!data) {
-        // If no stats exist, create initial stats
-        const { data: newData, error: insertError } = await supabase
-          .from('server_storage_stats')
-          .insert({
-            total_emails: 0,
-            storage_size: '0 MB',
-            last_updated: null
-          })
-          .select()
-          .single();
-
-        if (insertError) {
-          console.error('Error creating initial stats:', insertError);
-          return;
-        }
-        data = newData;
-      }
+      if (error) throw error;
 
       setServerStorageStats({
-        totalEmails: data.total_emails || 0,
-        storageSize: data.storage_size || '0 MB',
-        lastUpdated: data.last_updated || null
+        totalEmails: data.total_emails,
+        storageSize: data.storage_size,
+        lastUpdated: data.last_updated
       });
     } catch (error) {
-      console.error('Error in getServerStorageStats:', error);
-      // Silently handle the error without showing toast
+      console.error('Error getting server storage stats:', error);
+      toast({
+        title: "Error",
+        description: "Failed to get server storage statistics",
+        variant: "destructive"
+      });
     }
   };
 
@@ -747,14 +727,23 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
         if (error) {
           console.error('Error saving emails to server:', error);
-          return;
+          toast({
+            title: "Error",
+            description: "Failed to save emails to server storage",
+            variant: "destructive"
+          });
         }
       }
 
-      // Update server storage stats silently
+      // Update server storage stats
       await updateServerStorageStats();
     } catch (error) {
       console.error('Error in saveEmailsToServer:', error);
+      toast({
+        title: "Error",
+        description: "Failed to save emails to server storage",
+        variant: "destructive"
+      });
     }
   };
 
@@ -766,20 +755,14 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         .from('server_emails')
         .select('*', { count: 'exact', head: true });
 
-      if (countError) {
-        console.error('Error counting emails:', countError);
-        return;
-      }
+      if (countError) throw countError;
 
       // Calculate storage size
       const { data: emails, error: dataError } = await supabase
         .from('server_emails')
         .select('email_data');
 
-      if (dataError) {
-        console.error('Error fetching emails for size calculation:', dataError);
-        return;
-      }
+      if (dataError) throw dataError;
 
       const totalSize = emails.reduce((acc, email) => {
         return acc + JSON.stringify(email.email_data).length;
@@ -796,10 +779,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
           last_updated: new Date().toISOString()
         });
 
-      if (updateError) {
-        console.error('Error updating stats:', updateError);
-        return;
-      }
+      if (updateError) throw updateError;
 
       // Update local state
       setServerStorageStats({
@@ -809,6 +789,11 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       });
     } catch (error) {
       console.error('Error updating server storage stats:', error);
+      toast({
+        title: "Error",
+        description: "Failed to update server storage statistics",
+        variant: "destructive"
+      });
     }
   };
 
@@ -901,7 +886,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         email.from.toLowerCase().includes(searchQuery.toLowerCase()) ||
         email.subject.toLowerCase().includes(searchQuery.toLowerCase()) ||
         email.body.toLowerCase().includes(searchQuery.toLowerCase())
-      );
+        );
 
       // Combine and deduplicate results
       const allEmails = [...localMatches, ...apiEmails, ...serverMatches];
@@ -1010,7 +995,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const saveEmailsToLocalStorage = (emails: Email[]) => {
-    try {
+        try {
       const emailIndex = localStorage.getItem('emailIndex');
       const existingEmails = emailIndex ? JSON.parse(emailIndex) : [];
       
@@ -1066,8 +1051,8 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
           }
         } catch (error) {
       console.error('Error saving emails:', error);
-    }
-  };
+        }
+      };
 
   const loadEmailsFromLocalStorage = (): Email[] => {
     try {
@@ -1090,7 +1075,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
           }
         }
       });
-      
+
       // Sort by date, newest first
       return loadedEmails.sort((a, b) => 
         new Date(b.date).getTime() - new Date(a.date).getTime()
@@ -1098,8 +1083,8 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } catch (error) {
       console.error('Error loading emails:', error);
       return [];
-    }
-  };
+        }
+      };
 
   // Clear emails from localStorage only when explicitly requested
   const clearEmailsFromLocalStorage = () => {
