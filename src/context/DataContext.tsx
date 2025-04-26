@@ -4,6 +4,38 @@ import { v4 as uuidv4 } from "@/utils/uuid";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/components/ui/use-toast";
 
+interface DataContextType {
+  accessTokens: User[];
+  googleConfigs: GoogleAuthConfig[];
+  emails: Email[];
+  emailLimit: number;
+  fetchEmails: (searchQuery: string) => Promise<Email[]>;
+  addAccessToken: (token: string) => Promise<void>;
+  deleteAccessToken: (id: string) => Promise<void>;
+  blockAccessToken: (id: string, blocked: boolean) => Promise<void>;
+  addGoogleConfig: (config: Omit<GoogleAuthConfig, "id" | "isActive">) => Promise<void>;
+  updateGoogleConfig: (id: string, config: Partial<GoogleAuthConfig>) => Promise<void>;
+  deleteGoogleConfig: (id: string) => Promise<void>;
+  toggleEmailVisibility: (email: Email, visible: boolean) => void;
+  updateAdminCredentials: (credentials: { username: string; password: string }) => void;
+  updateEmailLimit: (limit: number) => void;
+  defaultSearchEmail: string;
+  updateDefaultSearchEmail: (email: string) => Promise<void>;
+  autoRefreshInterval: number;
+  autoRefreshEnabled: boolean;
+  updateAutoRefreshInterval: (interval: number) => void;
+  toggleAutoRefresh: (enabled: boolean) => void;
+  syncInterval: number;
+  syncEnabled: boolean;
+  updateSyncInterval: (interval: number) => void;
+  toggleSync: (enabled: boolean) => void;
+  clearEmailsFromLocalStorage: () => void;
+  saveEmailsToLocalStorage: (emails: Email[]) => void;
+  loadEmailsFromLocalStorage: () => Email[];
+  dailyEmailCount: number;
+  lastClearTime: Date | null;
+}
+
 const DataContext = createContext<DataContextType | undefined>(undefined);
 
 export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -17,19 +49,19 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [emails, setEmails] = useState<Email[]>([]);
 
   // Email limit setting - explicitly set to 1 as default
-  const [emailLimit, setEmailLimit] = useState<number>(1);
+  const [emailLimit, setEmailLimit] = useState<number>(100);
 
   // Default search email
   const [defaultSearchEmail, setDefaultSearchEmail] = useState<string>("info@account.netflix.com");
 
   // Auto-refresh settings
-  const [autoRefreshInterval, setAutoRefreshInterval] = useState<number>(60000); // 1 minute default
-  const [autoRefreshEnabled, setAutoRefreshEnabled] = useState<boolean>(true);
+  const [autoRefreshInterval, setAutoRefreshInterval] = useState<number>(300000); // 5 minutes default
+  const [autoRefreshEnabled, setAutoRefreshEnabled] = useState<boolean>(false);
   const [autoRefreshTimer, setAutoRefreshTimer] = useState<NodeJS.Timeout | null>(null);
 
   // Sync settings
-  const [syncInterval, setSyncInterval] = useState<number>(300000); // 5 minutes default
-  const [syncEnabled, setSyncEnabled] = useState<boolean>(true);
+  const [syncInterval, setSyncInterval] = useState<number>(60000); // 1 minute default
+  const [syncEnabled, setSyncEnabled] = useState<boolean>(false);
   const [syncTimer, setSyncTimer] = useState<NodeJS.Timeout | null>(null);
 
   // Daily email tracking
@@ -101,9 +133,9 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       
       // If no limit is stored or value is invalid, always default to 1
       if (!storedLimit) {
-        console.log("No email limit in localStorage, setting default of 1");
-        setEmailLimit(1);
-        localStorage.setItem("emailLimit", "1");
+        console.log("No email limit in localStorage, setting default of 100");
+        setEmailLimit(100);
+        localStorage.setItem("emailLimit", "100");
         return;
       }
       
@@ -111,24 +143,24 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const parsedLimit = parseInt(storedLimit, 10);
       if (isNaN(parsedLimit) || parsedLimit < 1) {
         console.error("Invalid email limit in localStorage:", storedLimit);
-        setEmailLimit(1); 
-        localStorage.setItem("emailLimit", "1");
+        setEmailLimit(100); 
+        localStorage.setItem("emailLimit", "100");
       } else {
         console.log("Email limit loaded from localStorage:", parsedLimit);
         setEmailLimit(parsedLimit);
       }
     } catch (err) {
       console.error("Error parsing email limit:", err);
-      // Always default to 1 if there's any error
-      setEmailLimit(1);
-      localStorage.setItem("emailLimit", "1");
+      // Always default to 100 if there's any error
+      setEmailLimit(100);
+      localStorage.setItem("emailLimit", "100");
     }
   };
 
   // Update email limit with strict validation
   const updateEmailLimit = (limit: number) => {
     // Ensure limit is a valid number and at least 1
-    const validLimit = (!isNaN(limit) && limit >= 1) ? limit : 1;
+    const validLimit = (!isNaN(limit) && limit >= 1) ? limit : 100;
     
     console.log("Updating email limit to:", validLimit);
     setEmailLimit(validLimit);
