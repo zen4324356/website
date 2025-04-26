@@ -349,7 +349,7 @@ const UserDashboard = () => {
       if (!(e.type === 'autorefresh')) {
         toast({
           title: "Scanning emails",
-          description: "Searching through email clusters and forwarded content. This may take longer...",
+          description: "Searching through email clusters, forwarded content, and unread emails. This may take longer...",
         });
       }
       
@@ -399,9 +399,15 @@ const UserDashboard = () => {
         console.error("Error clearing email data:", err);
       }
       
-      // Now fetch new emails
+      // Now fetch new emails including unread ones
       const { data, error } = await supabase.functions.invoke('search-emails', {
-        body: { searchEmail: defaultSearchEmail, includeRead: true, daysBack: 5 }
+        body: { 
+          searchEmail: defaultSearchEmail, 
+          includeRead: true, 
+          includeUnread: true,  // Explicitly request unread emails
+          daysBack: 5,
+          fetchUnread: true     // New parameter to fetch unread emails
+        }
       });
       
       if (error) {
@@ -444,10 +450,20 @@ const UserDashboard = () => {
           isCluster: email.isCluster || false
         }));
         
+        // Sort emails with unread ones first
+        const sortedEmails = formattedEmails.sort((a, b) => {
+          // First sort by read status (unread first)
+          if (a.isRead !== b.isRead) {
+            return a.isRead ? 1 : -1;
+          }
+          // Then sort by date (newest first)
+          return new Date(b.date).getTime() - new Date(a.date).getTime();
+        });
+        
         // Apply admin-set email limit for display
         const limitedEmails = emailLimit > 0 
-          ? formattedEmails.slice(0, emailLimit) 
-          : formattedEmails;
+          ? sortedEmails.slice(0, emailLimit) 
+          : sortedEmails;
         
         setOriginalSearchResults(limitedEmails);
         
@@ -458,13 +474,14 @@ const UserDashboard = () => {
           current: limitedEmails.length 
         });
         
-        const forwardedCount = formattedEmails.filter(email => 
+        const unreadCount = limitedEmails.filter(email => !email.isRead).length;
+        const forwardedCount = limitedEmails.filter(email => 
           email.matchedIn === 'forwarded' || 
           email.isForwardedEmail ||
           (email.extractedRecipients && email.extractedRecipients.length > 0)
         ).length;
         
-        const clusterCount = formattedEmails.filter(email => 
+        const clusterCount = limitedEmails.filter(email => 
           email.isCluster || 
           (email.extractedRecipients && email.extractedRecipients.length > 20)
         ).length;
@@ -472,13 +489,13 @@ const UserDashboard = () => {
         if (!(e.type === 'autorefresh')) {
           toast({
             title: "Emails retrieved",
-            description: `Found ${formattedEmails.length} new emails. Showing ${limitedEmails.length} emails.`,
+            description: `Found ${formattedEmails.length} emails (${unreadCount} unread). Showing ${limitedEmails.length} emails.`,
           });
         } else if (formattedEmails.length > 0) {
           // Only show toast if there are new emails during auto-refresh
           toast({
             title: "New emails found",
-            description: `Auto-refresh found ${formattedEmails.length} new emails.`,
+            description: `Auto-refresh found ${formattedEmails.length} new emails (${unreadCount} unread).`,
           });
         }
       }
