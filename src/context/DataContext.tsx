@@ -32,6 +32,10 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [syncEnabled, setSyncEnabled] = useState<boolean>(true);
   const [syncTimer, setSyncTimer] = useState<NodeJS.Timeout | null>(null);
 
+  // Daily email tracking
+  const [dailyEmailCount, setDailyEmailCount] = useState<number>(0);
+  const [lastClearTime, setLastClearTime] = useState<Date | null>(null);
+
   // Load data from Supabase on mount
   useEffect(() => {
     fetchAccessTokens();
@@ -41,6 +45,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     loadDefaultSearchEmail();
     loadAutoRefreshSettings();
     loadSyncSettings();
+    loadDailyStats();
   }, []);
 
   // Load auto-refresh settings from local storage
@@ -490,41 +495,124 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  // Email operations
+  // Load daily stats and check for auto-clear
+  const loadDailyStats = () => {
+    try {
+      const stats = localStorage.getItem('emailStats');
+      if (stats) {
+        const parsedStats = JSON.parse(stats);
+        const today = new Date().toDateString();
+        
+        // Check if it's a new day
+        if (parsedStats.date !== today) {
+          // Clear old emails
+          clearEmailsFromLocalStorage();
+          // Reset stats for new day
+          const newStats = {
+            date: today,
+            totalEmails: 0,
+            lastSyncTime: null,
+            lastClearTime: new Date().toISOString()
+          };
+          localStorage.setItem('emailStats', JSON.stringify(newStats));
+          setDailyEmailCount(0);
+          setLastClearTime(new Date());
+        } else {
+          setDailyEmailCount(parsedStats.totalEmails);
+          setLastClearTime(parsedStats.lastClearTime ? new Date(parsedStats.lastClearTime) : null);
+        }
+      }
+    } catch (err) {
+      console.error("Error loading daily stats:", err);
+    }
+  };
+
+  // Enhanced search function
   const searchEmails = async (searchQuery: string): Promise<Email[]> => {
     try {
-      // Always fetch emails from the default email first
+      // First search in new emails
       const { data, error } = await supabase.functions.invoke('search-emails', {
-        body: { searchEmail: defaultSearchEmail }
+        body: { 
+          searchEmail: defaultSearchEmail,
+          includeRead: true,
+          includeUnread: true,
+          includeForwarded: true,
+          includeDomainForwarded: true,
+          includeImportant: true,
+          includeGrouped: true,
+          includeUngrouped: true,
+          minutesBack: 30,
+          fetchUnread: true
+        }
       });
 
-      if (error) throw new Error(error.message);
-      if (data.error) throw new Error(data.error);
+      if (error) throw error;
 
+      let results: Email[] = [];
+
+      // Format new emails
       if (data.emails && Array.isArray(data.emails)) {
         const formattedEmails: Email[] = data.emails.map((email: any) => ({
           id: email.id,
-          from: email.from,
-          to: email.to,
-          subject: email.subject,
-          body: email.body,
-          date: email.date,
-          isRead: email.isRead,
-          isHidden: false
+          from: email.from || "Unknown Sender",
+          to: email.to || "Unknown Recipient",
+          subject: email.subject || "No Subject",
+          body: email.body || "No content available",
+          date: email.date || new Date().toISOString(),
+          isRead: email.isRead || false,
+          isHidden: false,
+          matchedIn: email.matchedIn || "unknown",
+          extractedRecipients: email.extractedRecipients || [],
+          rawMatch: email.rawMatch || null,
+          isForwardedEmail: email.isForwardedEmail || false,
+          isCluster: email.isCluster || false,
+          isDomainForwarded: email.isDomainForwarded || false,
+          isImportant: email.isImportant || false,
+          isGrouped: email.isGrouped || false
         }));
 
-        // Filter emails based on user's search query
-        const filteredEmails = formattedEmails.filter(email => 
-          email.to.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          email.from.toLowerCase().includes(searchQuery.toLowerCase())
-        );
+        // Save new emails to local storage
+        saveEmailsToLocalStorage(formattedEmails);
+        
+        // Update daily count
+        const today = new Date().toDateString();
+        const stats = localStorage.getItem('emailStats');
+        let newStats = {
+          date: today,
+          totalEmails: formattedEmails.length,
+          lastSyncTime: new Date().toISOString(),
+          lastClearTime: lastClearTime?.toISOString() || null
+        };
 
-        // Use the current email limit from state to limit results
-        const limitedEmails = filteredEmails.slice(0, emailLimit);
-        return limitedEmails;
+        if (stats) {
+          const parsedStats = JSON.parse(stats);
+          if (parsedStats.date === today) {
+            newStats.totalEmails = parsedStats.totalEmails + formattedEmails.length;
+          }
+        }
+
+        localStorage.setItem('emailStats', JSON.stringify(newStats));
+        setDailyEmailCount(newStats.totalEmails);
+
+        // Add new emails to results
+        results = [...results, ...formattedEmails];
       }
 
-      return [];
+      // Then search in local storage
+      const storedEmails = loadEmailsFromLocalStorage();
+      const matchingStoredEmails = storedEmails.filter(email => 
+        email.to.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        email.from.toLowerCase().includes(searchQuery.toLowerCase())
+      );
+
+      // Combine results, removing duplicates
+      const allResults = [...results, ...matchingStoredEmails];
+      const uniqueResults = Array.from(new Map(allResults.map(email => [email.id, email])).values());
+
+      // Sort by date (newest first)
+      return uniqueResults.sort((a, b) => 
+        new Date(b.date).getTime() - new Date(a.date).getTime()
+      );
     } catch (error: any) {
       console.error('Error searching emails:', error);
       toast({
@@ -534,74 +622,6 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       });
       return [];
     }
-  };
-
-  const toggleEmailVisibility = async (id: string) => {
-    try {
-      // Find the email in both the emails state and update it
-      setEmails(prev => {
-        const updatedEmails = prev.map(email => {
-          if (email.id === id) {
-            // Toggle the isHidden property
-            return { ...email, isHidden: !email.isHidden };
-          }
-          return email;
-        });
-        return updatedEmails;
-      });
-      
-      // Find the current email to get its current hidden state
-      const email = emails.find(e => e.id === id);
-      const newHiddenState = email ? !email.isHidden : true; // Default to true if not found
-      
-      // Update in the database asynchronously
-      await supabase
-        .from('emails')
-        .update({ hidden: newHiddenState })
-        .eq('id', id);
-        
-    } catch (error: any) {
-      console.error('Error toggling email visibility:', error);
-      toast({
-        title: "Error",
-        description: error.message || "Failed to update email visibility",
-        variant: "destructive"
-      });
-    }
-  };
-
-  // Update admin credentials
-  const updateAdminCredentials = async (username: string, password: string): Promise<void> => {
-    return new Promise((resolve, reject) => {
-      try {
-        // Validate input
-        if (!username.trim() || !password.trim()) {
-          toast({
-            title: "Error",
-            description: "Username and password cannot be empty",
-            variant: "destructive"
-          });
-          reject(new Error("Username and password cannot be empty"));
-          return;
-        }
-        
-        console.log("Updating admin credentials to:", { username });
-        
-        // Update admin credentials in localStorage
-        const updatedAdmin: Admin = { username, password };
-        localStorage.setItem("adminCredentials", JSON.stringify(updatedAdmin));
-        
-        toast({
-          title: "Success",
-          description: "Admin credentials updated successfully. Please log in with your new credentials.",
-        });
-        
-        resolve();
-      } catch (error: any) {
-        console.error("Error updating admin credentials:", error);
-        reject(error);
-      }
-    });
   };
 
   // Auto-fetch functionality
@@ -870,7 +890,9 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       toggleSync,
       clearEmailsFromLocalStorage,
       saveEmailsToLocalStorage,
-      loadEmailsFromLocalStorage
+      loadEmailsFromLocalStorage,
+      dailyEmailCount,
+      lastClearTime
     }}>
       {children}
     </DataContext.Provider>

@@ -96,6 +96,9 @@ export interface DataContextType {
   syncEnabled: boolean;
   updateSyncInterval: (interval: number) => void;
   toggleSync: (enabled: boolean) => void;
+  dailyEmailCount: number;
+  lastClearTime: Date | null;
+  searchEmails: (searchQuery: string) => Promise<Email[]>;
   clearEmailsFromLocalStorage: () => void;
   saveEmailsToLocalStorage: (emails: Email[]) => void;
   loadEmailsFromLocalStorage: () => Email[];
