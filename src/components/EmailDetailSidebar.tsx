@@ -125,225 +125,91 @@ const EmailDetailSidebar = ({ email, isOpen, onClose }: EmailDetailSidebarProps)
         }
       }
       
-      // Check if there are invisible characters that need to be removed
-      if (body.includes('&#8199;') || body.includes('&#847;') || body.includes('&shy;')) {
-        body = body.replace(/&#8199;|&#847;|&shy;/g, '');
-      }
+      // Remove invisible characters
+      body = body.replace(/&#8199;|&#847;|&shy;|&#8203;/g, '');
       
-      // If this is a multipart message with boundaries, extract the HTML part
-      if (body.includes('Content-Type: multipart/alternative') && body.includes('boundary=')) {
+      // Handle multipart messages
+      if (body.includes('Content-Type: multipart/alternative') || body.includes('Content-Type: multipart/mixed')) {
         try {
           const boundaryMatch = body.match(/boundary=["']?(.*?)["']?(\s|$)/);
           if (boundaryMatch && boundaryMatch[1]) {
             const boundary = boundaryMatch[1];
             const parts = body.split('--' + boundary);
             
-            // Look for HTML part
+            // Look for HTML part first, then plain text
             let htmlPart = '';
+            let plainTextPart = '';
+            
             for (const part of parts) {
               if (part.includes('Content-Type: text/html')) {
                 const contentStart = part.indexOf('<html');
                 if (contentStart > -1) {
                   htmlPart = part.substring(contentStart);
-                  break;
                 } else {
-                  // Look for content after headers
                   const headerEnd = part.indexOf('\r\n\r\n');
                   if (headerEnd > -1) {
                     htmlPart = part.substring(headerEnd + 4);
-                    break;
                   }
+                }
+              } else if (part.includes('Content-Type: text/plain')) {
+                const headerEnd = part.indexOf('\r\n\r\n');
+                if (headerEnd > -1) {
+                  plainTextPart = part.substring(headerEnd + 4);
                 }
               }
             }
             
-            if (htmlPart) {
-              body = htmlPart;
-            }
+            body = htmlPart || plainTextPart;
           }
         } catch (e) {
           console.error("Error extracting multipart content:", e);
-          // Continue with original body
         }
       }
       
-      // First preserve all links with their attributes
-      let cleanedBody = body;
-      
-      // If body is just plain text without HTML tags, wrap it in a div
+      // If body is plain text, convert to HTML
       if (!body.includes('<') || !body.includes('>')) {
-        cleanedBody = `<div style="white-space: pre-wrap; font-family: Arial, sans-serif; line-height: 1.6; color: #FFFFFF;">${body.replace(/\n/g, '<br>')}</div>`;
+        body = `<div style="white-space: pre-wrap; font-family: Arial, sans-serif; line-height: 1.6; color: #333;">${body.replace(/\n/g, '<br>')}</div>`;
       }
       
-      // Ensure all content is properly contained
-      cleanedBody = `<div style="max-width: 100%; overflow-x: hidden; word-wrap: break-word;">${cleanedBody}</div>`;
+      // Create a container for the email content
+      let cleanedBody = `<div style="max-width: 100%; overflow-x: auto; word-wrap: break-word; padding: 20px; background-color: #fff; color: #333;">${body}</div>`;
       
-      // Replace <a> tags with properly formatted ones but keep the href attributes
+      // Fix links
       cleanedBody = cleanedBody.replace(/<a\s+(?:[^>]*?\s+)?href=(["'])(.*?)\1/gi, 
         (match, quote, url) => `<a href=${quote}${url}${quote} target="_blank" rel="noopener noreferrer" style="color: #0071eb; text-decoration: underline;"`
       );
       
-      // Make sure all buttons are visible and properly styled
-      // First, fix buttons that have inline styles - NEVER hide or blur buttons
+      // Fix buttons
       cleanedBody = cleanedBody.replace(/<button(.*?)style="[^"]*"/gi, 
         (match, attrs) => `<button ${attrs} style="display: inline-block !important; visibility: visible !important; opacity: 1 !important; background-color: #e50914; color: white; padding: 12px 24px; border-radius: 4px; font-weight: bold; margin: 10px 0; cursor: pointer; border: none; text-decoration: none;"`
       );
       
-      // Then handle buttons without styles
-      cleanedBody = cleanedBody.replace(/<button\s+([^>]*?)>/gi, (match, attrs) => {
-        if (!attrs.includes('style=')) {
-          return `<button ${attrs} style="display: inline-block !important; visibility: visible !important; opacity: 1 !important; background-color: #e50914; color: white; padding: 12px 24px; border-radius: 4px; font-weight: bold; margin: 10px 0; cursor: pointer; border: none; text-decoration: none;">`;
-        }
-        return match;
-      });
+      // Fix tables
+      cleanedBody = cleanedBody.replace(/<table/gi, '<table style="width: 100%; border-collapse: collapse; margin-bottom: 16px;"');
+      cleanedBody = cleanedBody.replace(/<td/gi, '<td style="padding: 8px; border: 1px solid #ddd;"');
+      cleanedBody = cleanedBody.replace(/<th/gi, '<th style="padding: 8px; border: 1px solid #ddd; font-weight: bold;"');
       
-      // Netflix-specific button handling for "Get Code" buttons
-      cleanedBody = cleanedBody.replace(/<a\s+(?:[^>]*?\s+)?class=["']button["']/gi, 
-        '<a style="display: inline-block !important; visibility: visible !important; opacity: 1 !important; background-color: #e50914; color: white; text-align: center; padding: 12px 24px; border-radius: 4px; font-weight: bold; margin: 10px 0; text-decoration: none;"'
-      );
-      
-      // Handle any <a> tag with href containing "get" or "code" to ensure they're visible
-      cleanedBody = cleanedBody.replace(/<a\s+(?:[^>]*?\s+)?href=(["'])(.*?(?:get|code).*?)\1/gi, 
-        (match, quote, url) => `<a href=${quote}${url}${quote} target="_blank" rel="noopener noreferrer" style="display: inline-block !important; visibility: visible !important; opacity: 1 !important; color: #e50914; background-color: #fff; border: 2px solid #e50914; padding: 10px 20px; border-radius: 4px; font-weight: bold; margin: 10px 0; text-decoration: none;"`
-      );
-      
-      // Ensure "Get Code" text in buttons has proper styling
-      cleanedBody = cleanedBody.replace(/>(Get[^\<]*Code)</gi, 
-        ' style="display: block !important; visibility: visible !important; opacity: 1 !important; width: 100%; max-width: 300px; margin: 20px auto; background-color: #e50914; color: white; text-align: center; padding: 15px 0; border-radius: 4px; font-weight: bold; text-decoration: none;">$1<'
-      );
-      
-      // Remove any CSS that might hide buttons
-      cleanedBody = cleanedBody.replace(/(visibility\s*:\s*hidden|display\s*:\s*none|opacity\s*:\s*0)/gi, "visibility: visible !important; display: inline-block !important; opacity: 1 !important");
-      
-      // Apply consistent text formatting
-      cleanedBody = cleanedBody.replace(/<p/gi, '<p style="margin-bottom: 16px; line-height: 1.6; color: #0071eb; text-align: left;"');
-      cleanedBody = cleanedBody.replace(/<div/gi, '<div style="margin-bottom: 16px; line-height: 1.6; color: #0071eb; text-align: left;"');
-      cleanedBody = cleanedBody.replace(/<span/gi, '<span style="color: #0071eb; text-align: left;"');
-      
-      // Ensure all tables and their contents are properly aligned
-      cleanedBody = cleanedBody.replace(/<table/gi, '<table style="width: 100%; border-collapse: collapse; margin-bottom: 16px; text-align: left;"');
-      cleanedBody = cleanedBody.replace(/<td/gi, '<td style="padding: 8px; text-align: left; color: #0071eb;"');
-      cleanedBody = cleanedBody.replace(/<th/gi, '<th style="padding: 8px; text-align: left; font-weight: bold; color: #0071eb;"');
-      cleanedBody = cleanedBody.replace(/<tr/gi, '<tr style="border-bottom: 1px solid #eee;"');
-      
-      // Style headings for consistency
-      cleanedBody = cleanedBody.replace(/<h1/gi, '<h1 style="color: #0071eb; margin-top: 24px; margin-bottom: 16px; font-size: 24px; text-align: left;"');
-      cleanedBody = cleanedBody.replace(/<h2/gi, '<h2 style="color: #0071eb; margin-top: 20px; margin-bottom: 12px; font-size: 20px; text-align: left;"');
-      cleanedBody = cleanedBody.replace(/<h3/gi, '<h3 style="color: #0071eb; margin-top: 16px; margin-bottom: 10px; font-size: 18px; text-align: left;"');
-
-      // IMPORTANT: Make sure all iframes and scripts are removed (security)
-      cleanedBody = cleanedBody.replace(/<iframe[^>]*>[\s\S]*?<\/iframe>/gi, '');
-      cleanedBody = cleanedBody.replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '');
-      
-      // Clean all style tags but preserve content
-      cleanedBody = cleanedBody.replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '');
-      
-      // Highlight forwarded content sections
-      const forwardedSignatures = [
-        '---------- Forwarded message ---------',
-        '---------- Forwarded message ----------',
-        '---------- Forwarded Message ----------',
-        '---------- Forwarded Message ---------',
-        'Begin forwarded message:',
-        '---------- Original Message ----------',
-        'Original Message',
-        'Forwarded Message'
-      ];
-      
-      // Add a highlight to forwarded message sections
-      forwardedSignatures.forEach(signature => {
-        cleanedBody = cleanedBody.replace(
-          new RegExp(signature.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&'), 'gi'),
-          `<div style="background-color: #1a365d; border-left: 4px solid #0071eb; padding: 10px; margin: 15px 0; font-weight: bold; color: #0071eb;">${signature}</div>`
-        );
-      });
-
-      // Improve display of forwarded email headers
-      const headerPatterns = [
-        /From: (.*?)(?:<br|$)/gi,
-        /Date: (.*?)(?:<br|$)/gi,
-        /To: (.*?)(?:<br|$)/gi,
-        /Subject: (.*?)(?:<br|$)/gi,
-        /Cc: (.*?)(?:<br|$)/gi
-      ];
-      
-      headerPatterns.forEach(pattern => {
-        cleanedBody = cleanedBody.replace(pattern, match => 
-          `<div style="background-color: #2d3748; padding: 4px 8px; margin: 2px 0; border-left: 2px solid #4a5568; color: #0071eb;">${match}</div>`
-        );
-      });
-      
-      // Replace HTML entities
-      cleanedBody = cleanedBody.replace(/&nbsp;/g, ' ');
-      
-      // Fix for broken or incomplete HTML
-      if (!cleanedBody.includes('</div>')) {
-        cleanedBody += '</div>';
-      }
-      
-      // Make sure all images are displayed
+      // Fix images
       cleanedBody = cleanedBody.replace(/<img/gi, '<img style="max-width: 100%; height: auto;"');
       
-      // Ensure fixed width tables are responsive
-      cleanedBody = cleanedBody.replace(/width=(["'])\d+px\1/gi, 'width="100%"');
-      cleanedBody = cleanedBody.replace(/width=(["'])\d+%\1/gi, 'width="100%"');
+      // Remove potentially dangerous content
+      cleanedBody = cleanedBody.replace(/<iframe[^>]*>[\s\S]*?<\/iframe>/gi, '');
+      cleanedBody = cleanedBody.replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '');
+      cleanedBody = cleanedBody.replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '');
       
-      // Add Netflix's N logo if missing and message is from Netflix
-      if (email.from && email.from.toLowerCase().includes('netflix') && 
-          !cleanedBody.includes('netflix.com/logo') && 
-          !cleanedBody.includes('<img')) {
-        const netflixLogo = '<div style="margin-bottom: 16px;"><img src="https://assets.nflxext.com/us/email/logo/newDesign/logo_v2.png" alt="Netflix" style="max-width: 75px; margin-bottom: 16px;" /></div>';
-        cleanedBody = netflixLogo + cleanedBody;
-      }
+      // Ensure proper text formatting
+      cleanedBody = cleanedBody.replace(/<p/gi, '<p style="margin-bottom: 16px; line-height: 1.6;"');
+      cleanedBody = cleanedBody.replace(/<div/gi, '<div style="margin-bottom: 16px; line-height: 1.6;"');
       
-      // If content is too short or appears to be empty, provide a more detailed fallback
-      if ((cleanedBody.length < 100 && !cleanedBody.includes('<img')) || 
-          cleanedBody.includes("No content available") ||
-          cleanedBody.trim() === "<div></div>") {
-        
-        console.log("Email content is too short or empty, providing fallback view");
-        setContentError("Email content appears to be incomplete or empty");
-        
-        // Create a fallback view with basic email information and any content we have
-        return `<div style="padding: 20px; background-color: #553c0e; border-left: 4px solid #ffc107; margin-bottom: 20px;">
-          <h3 style="color: #ffd54f; margin-top: 0;">Email Content Issue</h3>
-          <p style="margin-bottom: 10px; color: #0071eb;">The email content appears to be incomplete or corrupted.</p>
-          <p style="color: #0071eb;">Try downloading the email using the button above to view the complete content.</p>
-        </div>
-        <div style="padding: 20px; background-color: #2d3748; border-radius: 4px;">
-          <p style="color: #0071eb;"><strong style="color: #0071eb;">Email Subject:</strong> ${email.subject || 'No Subject'}</p>
-          <p style="color: #0071eb;"><strong style="color: #0071eb;">From:</strong> ${email.from || 'Unknown Sender'}</p>
-          <p style="color: #0071eb;"><strong style="color: #0071eb;">To:</strong> ${email.to || 'Unknown Recipient'}</p>
-          <p style="color: #0071eb;"><strong style="color: #0071eb;">Date:</strong> ${new Date(email.date).toLocaleString()}</p>
-          ${email.isForwardedEmail ? '<p style="color: #0071eb;"><strong style="color: #0071eb;">Contains Forwarded Content:</strong> Yes</p>' : ''}
-          ${email.extractedRecipients && email.extractedRecipients.length > 0 ? 
-            `<p style="color: #0071eb;"><strong style="color: #0071eb;">Contains ${email.extractedRecipients.length} Recipients</strong></p>` : ''}
-          <div style="margin-top: 20px; padding-top: 10px; border-top: 1px solid #4a5568;">
-            <p style="color: #0071eb;"><strong style="color: #0071eb;">Content Preview:</strong></p>
-            <div style="color: #0071eb;">${body.length > 5000 ? body.substring(0, 5000) + '...' : body}</div>
-          </div>
-        </div>`;
-      }
+      // Fix headings
+      cleanedBody = cleanedBody.replace(/<h1/gi, '<h1 style="font-size: 24px; margin-top: 24px; margin-bottom: 16px;"');
+      cleanedBody = cleanedBody.replace(/<h2/gi, '<h2 style="font-size: 20px; margin-top: 20px; margin-bottom: 12px;"');
+      cleanedBody = cleanedBody.replace(/<h3/gi, '<h3 style="font-size: 18px; margin-top: 16px; margin-bottom: 10px;"');
       
-      return cleanedBody.trim();
-    } catch (error) {
-      console.error('Error cleaning email body:', error);
-      setContentError("Error displaying email content");
-      return `<div style="padding: 20px; background-color: #4a2c2a; border-left: 4px solid #f44336; margin-bottom: 20px;">
-        <h3 style="color: #ffcdd2; margin-top: 0;">Error Displaying Email</h3>
-        <p style="margin-bottom: 10px; color: #0071eb;">There was an error processing this email's content.</p>
-        <p style="color: #0071eb;">You can try downloading the raw email to view it outside the application.</p>
-      </div>
-      <div style="padding: 20px; background-color: #2d3748; border-radius: 4px;">
-        <p style="color: #0071eb;"><strong style="color: #0071eb;">Email Subject:</strong> ${email.subject || 'No Subject'}</p>
-        <p style="color: #0071eb;"><strong style="color: #0071eb;">From:</strong> ${email.from || 'Unknown Sender'}</p>
-        <p style="color: #0071eb;"><strong style="color: #0071eb;">To:</strong> ${email.to || 'Unknown Recipient'}</p>
-        <p style="color: #0071eb;"><strong style="color: #0071eb;">Date:</strong> ${new Date(email.date).toLocaleString()}</p>
-        <div style="margin-top: 20px; padding-top: 10px; border-top: 1px solid #4a5568;">
-          <p style="color: #0071eb;"><strong style="color: #0071eb;">Error Details:</strong></p>
-          <pre style="background: #1a202c; padding: 10px; overflow: auto; font-size: 12px; color: #0071eb;">${error.toString()}</pre>
-        </div>
-      </div>`;
+      return cleanedBody;
+    } catch (err) {
+      console.error("Error cleaning email body:", err);
+      return '<div class="p-4 text-red-500 font-medium">Error processing email content</div>';
     }
   };
 
