@@ -618,7 +618,10 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         .select('*')
         .single();
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error getting server storage stats:', error);
+        return;
+      }
 
       setServerStorageStats({
         totalEmails: data.total_emails,
@@ -627,11 +630,6 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       });
     } catch (error) {
       console.error('Error getting server storage stats:', error);
-      toast({
-        title: "Error",
-        description: "Failed to get server storage statistics",
-        variant: "destructive"
-      });
     }
   };
 
@@ -755,14 +753,20 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         .from('server_emails')
         .select('*', { count: 'exact', head: true });
 
-      if (countError) throw countError;
+      if (countError) {
+        console.error('Error counting server emails:', countError);
+        return;
+      }
 
       // Calculate storage size
       const { data: emails, error: dataError } = await supabase
         .from('server_emails')
         .select('email_data');
 
-      if (dataError) throw dataError;
+      if (dataError) {
+        console.error('Error getting server emails:', dataError);
+        return;
+      }
 
       const totalSize = emails.reduce((acc, email) => {
         return acc + JSON.stringify(email.email_data).length;
@@ -779,7 +783,10 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
           last_updated: new Date().toISOString()
         });
 
-      if (updateError) throw updateError;
+      if (updateError) {
+        console.error('Error updating server storage stats:', updateError);
+        return;
+      }
 
       // Update local state
       setServerStorageStats({
@@ -789,11 +796,6 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       });
     } catch (error) {
       console.error('Error updating server storage stats:', error);
-      toast({
-        title: "Error",
-        description: "Failed to update server storage statistics",
-        variant: "destructive"
-      });
     }
   };
 
