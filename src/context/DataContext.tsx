@@ -661,10 +661,11 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // 1. Check local storage first
       const localEmails = loadEmailsFromLocalStorage();
       const localMatches = localEmails.filter(email => 
-        email.to.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        email.from.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        email.subject.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        email.body.toLowerCase().includes(searchQuery.toLowerCase())
+        email.to.toLowerCase() === searchQuery.toLowerCase() ||
+        email.from.toLowerCase() === searchQuery.toLowerCase() ||
+        (email.extractedRecipients && email.extractedRecipients.some(recipient => 
+          recipient.toLowerCase() === searchQuery.toLowerCase()
+        ))
       ).map(email => ({
         ...email,
         source: 'local_storage',
@@ -676,10 +677,9 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const { data: dbData, error: dbError } = await supabase
         .from('server_emails')
         .select('email_data, updated_at')
-        .or(`email_data->>'to' ilike '%${searchQuery}%', 
-             email_data->>'from' ilike '%${searchQuery}%', 
-             email_data->>'subject' ilike '%${searchQuery}%', 
-             email_data->>'body' ilike '%${searchQuery}%'`)
+        .or(`email_data->>'to' = '${searchQuery}', 
+             email_data->>'from' = '${searchQuery}', 
+             email_data->>'extractedRecipients'::jsonb ? '${searchQuery}'`)
         .order('updated_at', { ascending: false });
 
       if (dbError) {
@@ -706,7 +706,8 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
           includeGrouped: true,
           includeUngrouped: true,
           minutesBack: 30,
-          fetchUnread: true
+          fetchUnread: true,
+          exactMatch: true // Add flag for exact matching
         }
       });
 
