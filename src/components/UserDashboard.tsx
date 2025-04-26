@@ -534,7 +534,7 @@ const UserDashboard = () => {
     });
   };
 
-  const handleEmailClick = (email: Email) => {
+  const handleEmailClick = async (email: Email) => {
     // First, ensure we have a valid email object
     if (!email || !email.id) {
       toast({

@@ -23,6 +23,7 @@ export interface GoogleAuthConfig {
 
 export interface Email {
   id: string;
+  tempId?: string;
   from: string;
   to: string;
   subject: string;
@@ -32,13 +33,13 @@ export interface Email {
   isHidden: boolean;
   matchedIn?: string;
   extractedRecipients?: string[];
-  rawMatch?: string;
+  rawMatch?: string | null;
   isForwardedEmail?: boolean;
   isCluster?: boolean;
   isLargeCluster?: boolean;
   recipientCount?: number;
-  rawContent?: string | null;
-  rawHeaders?: string | null;
+  rawContent?: string;
+  rawHeaders?: string;
   forwardedData?: {
     fromEmail: string | null;
     fromName: string | null;
@@ -49,13 +50,7 @@ export interface Email {
     isNetflixRelated?: boolean;
     importantSections?: string[];
   } | null;
-  forwardedContent?: Array<{
-    from?: string;
-    to?: string;
-    subject?: string;
-    date?: string;
-    body?: string;
-  }>;
+  forwardedContent?: any[];
 }
 
 export interface AuthContextType {

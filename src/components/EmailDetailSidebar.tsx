@@ -5,6 +5,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Mail, Clock, User, Download, Forward, Users, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { toast } from "@/components/ui/use-toast";
 
 interface EmailDetailSidebarProps {
   email: Email | null;
@@ -13,14 +14,55 @@ interface EmailDetailSidebarProps {
 }
 
 const EmailDetailSidebar = ({ email, isOpen, onClose }: EmailDetailSidebarProps) => {
-  if (!email) return null;
-
+  const [emailContent, setEmailContent] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
   const [isRendering, setIsRendering] = useState(true);
   const [contentError, setContentError] = useState<string | null>(null);
   const [processedBody, setProcessedBody] = useState<string>("");
   const [showRawHeaders, setShowRawHeaders] = useState(false);
   const [showSourceHtml, setShowSourceHtml] = useState(false);
   
+  useEffect(() => {
+    let mounted = true;
+
+    const loadEmailContent = async () => {
+      if (!email?.tempId || !isOpen) return;
+
+      setIsLoading(true);
+      try {
+        const response = await fetch(`/api/emails/temp/${email.tempId}`);
+        if (!response.ok) throw new Error('Failed to load email content');
+        
+        const content = await response.text();
+        if (mounted) {
+          setEmailContent(content);
+        }
+    } catch (error) {
+        console.error('Error loading email content:', error);
+        toast({
+          title: "Error",
+          description: "Failed to load email content. Please try again.",
+          variant: "destructive"
+        });
+      } finally {
+        if (mounted) {
+          setIsLoading(false);
+        }
+      }
+    };
+
+    loadEmailContent();
+
+    return () => {
+      mounted = false;
+      // Clean up temp file when closing
+      if (email?.tempId) {
+        fetch(`/api/emails/temp/${email.tempId}`, { method: 'DELETE' })
+          .catch(error => console.error('Error cleaning up temp email:', error));
+      }
+    };
+  }, [email?.tempId, isOpen]);
+
   useEffect(() => {
     if (isOpen) {
       setIsRendering(true);
