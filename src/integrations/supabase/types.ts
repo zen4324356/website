@@ -6,156 +6,140 @@ export type Json =
   | { [key: string]: Json | undefined }
   | Json[]
 
-export interface Database {
+export type Database = {
   public: {
     Tables: {
-      admin_settings: {
-        Row: {
-          id: string
-          email_limit: number
-          auto_refresh_enabled: boolean
-          auto_refresh_interval: number
-          default_search_email: string | null
-          created_at: string
-          updated_at: string
-        }
-        Insert: {
-          id?: string
-          email_limit?: number
-          auto_refresh_enabled?: boolean
-          auto_refresh_interval?: number
-          default_search_email?: string | null
-          created_at?: string
-          updated_at?: string
-        }
-        Update: {
-          id?: string
-          email_limit?: number
-          auto_refresh_enabled?: boolean
-          auto_refresh_interval?: number
-          default_search_email?: string | null
-          created_at?: string
-          updated_at?: string
-        }
-      }
-      server_storage_stats: {
-        Row: {
-          id: string
-          total_emails: number
-          storage_size: string
-          last_updated: string | null
-          created_at: string
-          updated_at: string
-        }
-        Insert: {
-          id?: string
-          total_emails?: number
-          storage_size?: string
-          last_updated?: string | null
-          created_at?: string
-          updated_at?: string
-        }
-        Update: {
-          id?: string
-          total_emails?: number
-          storage_size?: string
-          last_updated?: string | null
-          created_at?: string
-          updated_at?: string
-        }
-      }
-      server_emails: {
-        Row: {
-          id: string
-          domain: string
-          email_data: Json
-          created_at: string
-          updated_at: string
-        }
-        Insert: {
-          id: string
-          domain: string
-          email_data: Json
-          created_at?: string
-          updated_at?: string
-        }
-        Update: {
-          id?: string
-          domain?: string
-          email_data?: Json
-          created_at?: string
-          updated_at?: string
-        }
-      }
       access_tokens: {
         Row: {
+          blocked: boolean | null
+          created_at: string | null
+          description: string
+          expires_at: string
           id: string
-          access_token: string
-          is_blocked: boolean
-          created_at: string
-          updated_at: string
+          token: string
+          user_id: string | null
         }
         Insert: {
+          blocked?: boolean | null
+          created_at?: string | null
+          description: string
+          expires_at: string
           id?: string
-          access_token: string
-          is_blocked?: boolean
-          created_at?: string
-          updated_at?: string
+          token: string
+          user_id?: string | null
         }
         Update: {
+          blocked?: boolean | null
+          created_at?: string | null
+          description?: string
+          expires_at?: string
           id?: string
-          access_token?: string
-          is_blocked?: boolean
-          created_at?: string
-          updated_at?: string
+          token?: string
+          user_id?: string | null
         }
+        Relationships: []
       }
-      google_configs: {
+      emails: {
         Row: {
+          date: string | null
+          from_address: string
+          hidden: boolean | null
           id: string
+          read: boolean | null
+          snippet: string
+          subject: string
+          to_address: string
+          user_id: string | null
+        }
+        Insert: {
+          date?: string | null
+          from_address: string
+          hidden?: boolean | null
+          id?: string
+          read?: boolean | null
+          snippet: string
+          subject: string
+          to_address: string
+          user_id?: string | null
+        }
+        Update: {
+          date?: string | null
+          from_address?: string
+          hidden?: boolean | null
+          id?: string
+          read?: boolean | null
+          snippet?: string
+          subject?: string
+          to_address?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
+      google_auth: {
+        Row: {
+          access_token: string | null
+          active: boolean | null
           client_id: string
           client_secret: string
-          project_id: string | null
-          auth_uri: string
-          token_uri: string
-          auth_provider_cert_url: string
-          is_active: boolean
-          access_token: string | null
+          created_at: string | null
+          description: string
+          id: string
           refresh_token: string | null
           token_expiry: string | null
+          user_id: string | null
+        }
+        Insert: {
+          access_token?: string | null
+          active?: boolean | null
+          client_id: string
+          client_secret: string
+          created_at?: string | null
+          description: string
+          id?: string
+          refresh_token?: string | null
+          token_expiry?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          access_token?: string | null
+          active?: boolean | null
+          client_id?: string
+          client_secret?: string
+          created_at?: string | null
+          description?: string
+          id?: string
+          refresh_token?: string | null
+          token_expiry?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
+      video_settings: {
+        Row: {
+          id: string
+          video_url: string
           created_at: string
           updated_at: string
+          is_active: boolean
+          name: string
         }
         Insert: {
           id?: string
-          client_id: string
-          client_secret: string
-          project_id?: string | null
-          auth_uri?: string
-          token_uri?: string
-          auth_provider_cert_url?: string
-          is_active?: boolean
-          access_token?: string | null
-          refresh_token?: string | null
-          token_expiry?: string | null
+          video_url: string
           created_at?: string
           updated_at?: string
+          is_active?: boolean
+          name: string
         }
         Update: {
           id?: string
-          client_id?: string
-          client_secret?: string
-          project_id?: string | null
-          auth_uri?: string
-          token_uri?: string
-          auth_provider_cert_url?: string
-          is_active?: boolean
-          access_token?: string | null
-          refresh_token?: string | null
-          token_expiry?: string | null
+          video_url?: string
           created_at?: string
           updated_at?: string
+          is_active?: boolean
+          name?: string
         }
+        Relationships: []
       }
     }
     Views: {
@@ -165,6 +149,9 @@ export interface Database {
       [_ in never]: never
     }
     Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
       [_ in never]: never
     }
   }
