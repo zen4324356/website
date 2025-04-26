@@ -109,11 +109,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       });
       
       return true;
-    } catch (error: any) {
+    } catch (error) {
       console.error("Login error:", error);
+      const errorMessage = error instanceof Error ? error.message : "An error occurred during login.";
       toast({
         title: "Login Failed",
-        description: error.message || "An error occurred during login.",
+        description: errorMessage,
         variant: "destructive"
       });
       return false;
