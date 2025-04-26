@@ -820,6 +820,30 @@ const UserDashboard = () => {
                       <Mail className={`h-4 w-4 ${email.isRead ? 'text-gray-400' : 'text-netflix-red'}`} />
                       <span className={`${!email.isRead ? 'text-white font-bold email-unread' : ''}`}>{email.subject}</span>
                       
+                      {/* Source Tag */}
+                      {email.sourceTag && (
+                        <span className={`text-xs px-2 py-0.5 rounded badge-new ${
+                          email.source === 'gmail_api' ? 'bg-green-600' :
+                          email.source === 'server_database' ? 'bg-yellow-600' :
+                          'bg-gray-600'
+                        } text-white`}>
+                          {email.source === 'gmail_api' ? 'Gmail API - Live' :
+                           email.source === 'server_database' ? 'Server DB - Cached' :
+                           'Local Storage - Offline'}
+                        </span>
+                      )}
+
+                      {/* Text Tag */}
+                      {email.matchedIn && (
+                        <span className="text-xs bg-blue-600 text-white px-2 py-0.5 rounded badge-new">
+                          {email.matchedIn === 'forwarded' ? 'Forwarded Content' :
+                           email.matchedIn === 'subject' ? 'Subject Match' :
+                           email.matchedIn === 'body' ? 'Body Match' :
+                           email.matchedIn === 'recipient' ? 'Recipient Match' :
+                           'Matched'}
+                        </span>
+                      )}
+                      
                       {email.isForwardedEmail && (
                         <span className="text-xs bg-blue-600 text-white px-2 py-0.5 rounded badge-new">Forwarded</span>
                       )}

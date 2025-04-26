@@ -42,6 +42,9 @@ export interface Email {
   isDomainForwarded: boolean;
   isImportant: boolean;
   isGrouped: boolean;
+  source?: 'gmail_api' | 'server_database' | 'local_storage';
+  sourceTag?: string;
+  lastUpdated?: string;
 }
 
 export interface AuthContextType {
