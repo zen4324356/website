@@ -1,0 +1,9 @@
+{
+  "jobs": [
+    {
+      "name": "check-new-emails",
+      "schedule": "*/3 * * * * *",
+      "function": "email-cron"
+    }
+  ]
+} 
