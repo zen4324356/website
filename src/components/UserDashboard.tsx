@@ -535,35 +535,91 @@ const UserDashboard = () => {
   };
 
   const handleEmailClick = (email: Email) => {
-    // Make sure the email has required properties before showing it
-    if (!email || !email.subject) {
+    // First, ensure we have a valid email object
+    if (!email || !email.id) {
       toast({
         title: "Error",
-        description: "This email cannot be displayed. It may be corrupted or incomplete.",
+        description: "Invalid email data. Please try refreshing the page.",
         variant: "destructive"
       });
       return;
     }
-    
-    // Create a complete email object for the sidebar
-    const completeEmail: Email = {
-      id: email.id,
-      from: email.from || "No sender information",
-      to: email.to || "No recipient information",
-      subject: email.subject || "No subject",
-      body: email.body || "No content available",
-      date: email.date || new Date().toISOString(),
-      isRead: email.isRead || false,
-      isHidden: email.isHidden || false,
-      matchedIn: email.matchedIn || "",
-      extractedRecipients: email.extractedRecipients || [],
-      rawMatch: email.rawMatch || "",
-      isForwardedEmail: email.isForwardedEmail || false,
-      isCluster: email.isCluster || false
-    };
-    
-    setSelectedEmail(completeEmail);
-    setIsSidebarOpen(true);
+
+    // Try to get fresh data from localStorage first
+    try {
+      const storedEmailKey = `email_${email.id}`;
+      const storedEmail = localStorage.getItem(storedEmailKey);
+      let emailToDisplay: Email;
+
+      if (storedEmail) {
+        // Use stored email data if available
+        const parsedEmail = JSON.parse(storedEmail);
+        emailToDisplay = {
+          id: parsedEmail.id,
+          from: parsedEmail.from || email.from || "No sender information",
+          to: parsedEmail.to || email.to || "No recipient information",
+          subject: parsedEmail.subject || email.subject || "No subject",
+          body: parsedEmail.body || email.body || "No content available",
+          date: parsedEmail.date || email.date || new Date().toISOString(),
+          isRead: parsedEmail.isRead || email.isRead || false,
+          isHidden: parsedEmail.isHidden || email.isHidden || false,
+          matchedIn: parsedEmail.matchedIn || email.matchedIn || "",
+          extractedRecipients: parsedEmail.extractedRecipients || email.extractedRecipients || [],
+          rawMatch: parsedEmail.rawMatch || email.rawMatch || "",
+          isForwardedEmail: parsedEmail.isForwardedEmail || email.isForwardedEmail || false,
+          isCluster: parsedEmail.isCluster || email.isCluster || false
+        };
+      } else {
+        // Fall back to the provided email data
+        emailToDisplay = {
+          ...email,
+          from: email.from || "No sender information",
+          to: email.to || "No recipient information",
+          subject: email.subject || "No subject",
+          body: email.body || "No content available",
+          date: email.date || new Date().toISOString(),
+          isRead: email.isRead || false,
+          isHidden: email.isHidden || false,
+          matchedIn: email.matchedIn || "",
+          extractedRecipients: email.extractedRecipients || [],
+          rawMatch: email.rawMatch || "",
+          isForwardedEmail: email.isForwardedEmail || false,
+          isCluster: email.isCluster || false
+        };
+      }
+
+      // Update localStorage with the latest data
+      localStorage.setItem(storedEmailKey, JSON.stringify(emailToDisplay));
+      
+      // Update email index in localStorage
+      const emailIndex = localStorage.getItem('emailIndex');
+      const emailIds = emailIndex ? JSON.parse(emailIndex) : [];
+      if (!emailIds.includes(email.id)) {
+        emailIds.push(email.id);
+        localStorage.setItem('emailIndex', JSON.stringify(emailIds));
+      }
+
+      // Set the selected email and open sidebar
+      setSelectedEmail(emailToDisplay);
+      setIsSidebarOpen(true);
+
+      // Mark email as read
+      emailToDisplay.isRead = true;
+      localStorage.setItem(storedEmailKey, JSON.stringify(emailToDisplay));
+      
+      // Update the email in the current view
+      setSearchResults(prev => 
+        prev.map(e => e.id === emailToDisplay.id ? { ...e, isRead: true } : e)
+      );
+
+    } catch (error) {
+      console.error('Error handling email click:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load email details. Please try refreshing the page.",
+        variant: "destructive"
+      });
+    }
   };
 
   const handleToEmailFilter = (e: React.ChangeEvent<HTMLInputElement>) => {
