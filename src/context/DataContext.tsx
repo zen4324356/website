@@ -671,29 +671,6 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, [autoRefreshEnabled, autoRefreshInterval, defaultSearchEmail]);
 
-  const clearEmailsFromLocalStorage = () => {
-    try {
-      const emailKeys = Object.keys(localStorage).filter(key => 
-        key.startsWith('email_') || 
-        key.startsWith('search_') || 
-        key.startsWith('emails_')
-      );
-      emailKeys.forEach(key => localStorage.removeItem(key));
-      setEmails([]);
-      toast({
-        title: "Storage Cleared",
-        description: "All stored emails have been cleared.",
-      });
-    } catch (error) {
-      console.error('Error clearing emails:', error);
-      toast({
-        title: "Error",
-        description: "Failed to clear stored emails.",
-        variant: "destructive"
-      });
-    }
-  };
-
   const saveEmailsToLocalStorage = (emails: Email[]) => {
     try {
       const emailIndex = localStorage.getItem('emailIndex');
@@ -722,8 +699,11 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
           if (index > -1) {
             existingEmails.splice(index, 1);
           }
+          return true; // Include in new emails to store
         }
-        return true;
+        
+        // Only include if it's a completely new email
+        return !existingEmails.includes(email.id);
       });
 
       if (newEmails.length > 0) {
@@ -738,9 +718,12 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const storedCount = updatedIndex.length;
         localStorage.setItem('storedEmailCount', storedCount.toString());
         
+        // Store last update timestamp
+        localStorage.setItem('emailsLastUpdated', new Date().toISOString());
+        
         toast({
-          title: "Emails Stored",
-          description: `Added ${newEmails.length} new emails to local storage. Total stored: ${storedCount}`,
+          title: "Emails Updated",
+          description: `Updated ${newEmails.length} emails in local storage. Total stored: ${storedCount}`,
         });
       }
     } catch (error) {
@@ -754,15 +737,57 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (!emailIndex) return [];
       
       const emailIds = JSON.parse(emailIndex);
-      return emailIds
-        .map((id: string) => {
-          const email = localStorage.getItem(`email_${id}`);
-          return email ? JSON.parse(email) : null;
-        })
-        .filter((email: Email | null) => email !== null);
+      const loadedEmails: Email[] = [];
+      
+      emailIds.forEach((id: string) => {
+        const email = localStorage.getItem(`email_${id}`);
+        if (email) {
+          try {
+            const parsedEmail = JSON.parse(email);
+            if (parsedEmail && parsedEmail.id) {
+              loadedEmails.push(parsedEmail);
+            }
+          } catch (e) {
+            console.error(`Error parsing email ${id}:`, e);
+          }
+        }
+      });
+      
+      // Sort by date, newest first
+      return loadedEmails.sort((a, b) => 
+        new Date(b.date).getTime() - new Date(a.date).getTime()
+      );
     } catch (error) {
       console.error('Error loading emails:', error);
       return [];
+    }
+  };
+
+  // Clear emails from localStorage only when explicitly requested
+  const clearEmailsFromLocalStorage = () => {
+    try {
+      const emailKeys = Object.keys(localStorage).filter(key => 
+        key.startsWith('email_') || 
+        key === 'emailIndex' || 
+        key === 'storedEmailCount' ||
+        key === 'emailsLastUpdated'
+      );
+      
+      emailKeys.forEach(key => localStorage.removeItem(key));
+      setEmails([]);
+      
+      toast({
+        title: "Storage Cleared",
+        description: "All stored emails have been cleared. This action cannot be undone.",
+        variant: "destructive"
+      });
+    } catch (error) {
+      console.error('Error clearing emails:', error);
+      toast({
+        title: "Error",
+        description: "Failed to clear stored emails.",
+        variant: "destructive"
+      });
     }
   };
 
