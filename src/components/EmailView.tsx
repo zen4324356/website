@@ -1,11 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { Email } from '@/types';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { motion, AnimatePresence } from 'framer-motion';
 import { format } from 'date-fns';
-import { ChevronLeft, ChevronRight, RefreshCw, Trash2, Archive, Flag, MoreVertical } from 'lucide-react';
+import { ChevronLeft, ChevronRight, RefreshCw, Trash2, Archive, Flag, MoreVertical, Reply, Forward, Clock } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface EmailViewProps {
@@ -56,8 +55,10 @@ export const EmailView: React.FC<EmailViewProps> = ({
   const cleanBody = (body: string) => {
     if (!body) return '';
     
-    // Remove HTML tags
-    let cleaned = body.replace(/<[^>]*>/g, '');
+    // Remove HTML tags and scripts
+    let cleaned = body.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '');
+    cleaned = cleaned.replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, '');
+    cleaned = cleaned.replace(/<[^>]*>/g, '');
     
     // Remove non-printable characters and special symbols
     cleaned = cleaned.replace(/[\u0000-\u001F\u007F-\u009F\u00A0\u00AD\u2000-\u200F\u2028-\u202F\u205F-\u206F\u3000\uFEFF]/g, '');
@@ -65,8 +66,9 @@ export const EmailView: React.FC<EmailViewProps> = ({
     // Remove specific unwanted characters
     cleaned = cleaned.replace(/Â/g, '');
     
-    // Remove extra whitespace
+    // Remove extra whitespace and normalize line breaks
     cleaned = cleaned.replace(/\s+/g, ' ').trim();
+    cleaned = cleaned.replace(/\n\s*\n/g, '\n\n');
     
     // Remove any remaining special characters but keep basic punctuation
     cleaned = cleaned.replace(/[^\w\s.,!?-]/g, '');
@@ -141,13 +143,6 @@ export const EmailView: React.FC<EmailViewProps> = ({
               >
                 <Flag className="h-5 w-5" />
               </Button>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="hover:bg-gray-100 dark:hover:bg-gray-700"
-              >
-                <MoreVertical className="h-5 w-5" />
-              </Button>
             </div>
           </motion.div>
 
@@ -166,10 +161,10 @@ export const EmailView: React.FC<EmailViewProps> = ({
                 initial={{ opacity: 0, x: -20 }}
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ delay: 0.1 }}
-                className="space-y-2"
+                className="space-y-4"
               >
                 <div className="flex items-center justify-between">
-                  <h3 className="text-xl font-semibold">{currentEmail.subject}</h3>
+                  <h3 className="text-2xl font-semibold">{currentEmail.subject}</h3>
                   <div className="flex items-center space-x-2">
                     <Badge variant={currentEmail.isRead ? "default" : "secondary"}>
                       {currentEmail.isRead ? "Read" : "Unread"}
@@ -182,33 +177,55 @@ export const EmailView: React.FC<EmailViewProps> = ({
                   </div>
                 </div>
                 <div className="flex items-center justify-between text-sm text-gray-500 dark:text-gray-400">
-                  <div>
-                    <span className="font-medium">From:</span> {currentEmail.from}
+                  <div className="flex items-center space-x-2">
+                    <span className="font-medium">From:</span>
+                    <span className="text-gray-900 dark:text-gray-100">{currentEmail.from}</span>
                   </div>
-                  <div>
-                    <span className="font-medium">To:</span> {currentEmail.to}
+                  <div className="flex items-center space-x-2">
+                    <Clock className="h-4 w-4" />
+                    <span>{formatDate(currentEmail.date)}</span>
                   </div>
                 </div>
-                <div className="text-sm text-gray-500 dark:text-gray-400">
-                  {formatDate(currentEmail.date)}
+                <div className="flex items-center space-x-2 text-sm text-gray-500 dark:text-gray-400">
+                  <span className="font-medium">To:</span>
+                  <span className="text-gray-900 dark:text-gray-100">{currentEmail.to}</span>
                 </div>
+              </motion.div>
+
+              {/* Action Buttons */}
+              <motion.div 
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.2 }}
+                className="flex justify-center space-x-4 py-4 border-y dark:border-gray-700"
+              >
+                <Button variant="outline" size="sm" className="flex items-center space-x-2">
+                  <Reply className="h-4 w-4" />
+                  <span>Reply</span>
+                </Button>
+                <Button variant="outline" size="sm" className="flex items-center space-x-2">
+                  <Forward className="h-4 w-4" />
+                  <span>Forward</span>
+                </Button>
               </motion.div>
 
               {/* Email Body */}
               <motion.div 
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.2 }}
+                transition={{ delay: 0.3 }}
                 className="prose dark:prose-invert max-w-none"
               >
-                <p className="whitespace-pre-wrap">{cleanBody(currentEmail.body)}</p>
+                <div className="whitespace-pre-wrap text-gray-900 dark:text-gray-100">
+                  {cleanBody(currentEmail.body)}
+                </div>
               </motion.div>
 
               {/* Email Footer */}
               <motion.div 
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.3 }}
+                transition={{ delay: 0.4 }}
                 className="flex flex-col items-center justify-center space-y-4 pt-4 border-t dark:border-gray-700"
               >
                 <div className="flex items-center space-x-4">
@@ -217,10 +234,10 @@ export const EmailView: React.FC<EmailViewProps> = ({
                     size="sm"
                     onClick={handlePrevious}
                     disabled={emails.length <= 1}
-                    className="flex items-center justify-center"
+                    className="flex items-center space-x-2"
                   >
-                    <ChevronLeft className="h-4 w-4 mr-1" />
-                    Previous
+                    <ChevronLeft className="h-4 w-4" />
+                    <span>Previous</span>
                   </Button>
                   <span className="text-sm text-gray-500 dark:text-gray-400">
                     {currentIndex + 1} of {emails.length}
@@ -230,14 +247,11 @@ export const EmailView: React.FC<EmailViewProps> = ({
                     size="sm"
                     onClick={handleNext}
                     disabled={emails.length <= 1}
-                    className="flex items-center justify-center"
+                    className="flex items-center space-x-2"
                   >
-                    Next
-                    <ChevronRight className="h-4 w-4 ml-1" />
+                    <span>Next</span>
+                    <ChevronRight className="h-4 w-4" />
                   </Button>
-                </div>
-                <div className="text-sm text-gray-500 dark:text-gray-400">
-                  Source: {currentEmail.matchedIn || 'Unknown'}
                 </div>
               </motion.div>
             </motion.div>
