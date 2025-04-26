@@ -353,7 +353,7 @@ const UserDashboard = () => {
         });
       }
       
-      // Clear all browser data before starting new search
+      // Clear only email-related data
       try {
         // Store authentication data temporarily
         const authData = {
@@ -361,46 +361,42 @@ const UserDashboard = () => {
           adminCredentials: localStorage.getItem("adminCredentials")
         };
         
-        // Clear localStorage
-        localStorage.clear();
+        // Clear only email-related items from localStorage
+        const emailKeys = Object.keys(localStorage).filter(key => 
+          key.startsWith('email_') || 
+          key.startsWith('search_') || 
+          key.startsWith('emails_')
+        );
+        emailKeys.forEach(key => localStorage.removeItem(key));
         
-        // Restore authentication data
-        if (authData.user) {
-          localStorage.setItem("user", authData.user);
-        }
-        if (authData.adminCredentials) {
-          localStorage.setItem("adminCredentials", authData.adminCredentials);
-        }
+        // Clear only email-related items from sessionStorage
+        const sessionEmailKeys = Object.keys(sessionStorage).filter(key => 
+          key.startsWith('email_') || 
+          key.startsWith('search_') || 
+          key.startsWith('emails_')
+        );
+        sessionEmailKeys.forEach(key => sessionStorage.removeItem(key));
         
-        // Clear sessionStorage
-        sessionStorage.clear();
-        
-        // Clear all cookies
+        // Clear only email-related cookies
         const cookies = document.cookie.split(";");
         for (let i = 0; i < cookies.length; i++) {
           const cookie = cookies[i];
           const eqPos = cookie.indexOf("=");
-          const name = eqPos > -1 ? cookie.substr(0, eqPos) : cookie;
-          document.cookie = name + "=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/";
+          const name = eqPos > -1 ? cookie.substr(0, eqPos).trim() : cookie.trim();
+          if (name.startsWith('email_') || name.startsWith('search_') || name.startsWith('emails_')) {
+            document.cookie = name + "=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/";
+          }
         }
         
-        // Clear indexedDB
+        // Clear email-related IndexedDB data
         const dbs = await window.indexedDB.databases();
-        dbs.forEach(db => {
-          if (db.name) {
+        for (const db of dbs) {
+          if (db.name && (db.name.includes('email') || db.name.includes('search'))) {
             window.indexedDB.deleteDatabase(db.name);
           }
-        });
-        
-        // Clear cache storage
-        if ('caches' in window) {
-          const cacheNames = await caches.keys();
-          await Promise.all(cacheNames.map(name => caches.delete(name)));
         }
-        
-        console.log("All browser data cleared successfully");
-      } catch (clearError) {
-        console.error("Error clearing browser data:", clearError);
+      } catch (err) {
+        console.error("Error clearing email data:", err);
       }
       
       // Now fetch new emails
