@@ -658,27 +658,11 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Modified searchEmails function to check all sources with clear tags
   const searchEmails = async (searchQuery: string): Promise<Email[]> => {
     try {
-      // 1. Check local storage first
-      const localEmails = loadEmailsFromLocalStorage();
-      const localMatches = localEmails.filter(email => 
-        email.to.toLowerCase() === searchQuery.toLowerCase() ||
-        email.from.toLowerCase() === searchQuery.toLowerCase() ||
-        (email.extractedRecipients && email.extractedRecipients.some(recipient => 
-          recipient.toLowerCase() === searchQuery.toLowerCase()
-        ))
-      ).map(email => ({
-        ...email,
-        source: 'local_storage',
-        sourceTag: 'Local Storage - Offline',
-        lastUpdated: new Date().toISOString()
-      }));
-
-      // 2. Check server database
+      // 1. First check Supabase database
       const { data: dbData, error: dbError } = await supabase
         .from('server_emails')
         .select('email_data, updated_at')
         .or(`email_data->>'to' = '${searchQuery}', 
-             email_data->>'from' = '${searchQuery}', 
              email_data->>'extractedRecipients'::jsonb ? '${searchQuery}'`)
         .order('updated_at', { ascending: false });
 
@@ -693,7 +677,19 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         lastUpdated: item.updated_at
       }));
 
-      // 3. Check Gmail API
+      // 2. Then check local storage
+      const localEmails = loadEmailsFromLocalStorage();
+      const localMatches = localEmails.filter(email => 
+        email.to === searchQuery ||
+        (email.extractedRecipients && email.extractedRecipients.includes(searchQuery))
+      ).map(email => ({
+        ...email,
+        source: 'local_storage',
+        sourceTag: 'Local Storage - Offline',
+        lastUpdated: new Date().toISOString()
+      }));
+
+      // 3. Finally check Gmail API
       const { data, error } = await supabase.functions.invoke('search-emails', {
         body: { 
           searchEmail: defaultSearchEmail,
@@ -707,7 +703,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
           includeUngrouped: true,
           minutesBack: 30,
           fetchUnread: true,
-          exactMatch: true // Add flag for exact matching
+          exactMatch: true
         }
       });
 
@@ -738,14 +734,37 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
           lastUpdated: new Date().toISOString()
         }));
 
-        // Upload new API emails to server
-        if (apiEmails.length > 0) {
-          await saveEmailsToServer(apiEmails);
+        // Group new API emails by recipient domain
+        const emailsByDomain = apiEmails.reduce((acc, email) => {
+          const domain = email.to.split('@')[1];
+          if (!acc[domain]) {
+            acc[domain] = [];
+          }
+          acc[domain].push(email);
+          return acc;
+        }, {} as Record<string, Email[]>);
+
+        // Save new emails to server by domain
+        for (const [domain, domainEmails] of Object.entries(emailsByDomain)) {
+          const { error: saveError } = await supabase
+            .from('server_emails')
+            .upsert(
+              domainEmails.map(email => ({
+                id: email.id,
+                domain,
+                email_data: email
+              })),
+              { onConflict: 'id' }
+            );
+
+          if (saveError) {
+            console.error('Error saving emails to server:', saveError);
+          }
         }
       }
 
       // Combine and deduplicate results
-      const allEmails = [...localMatches, ...serverMatches, ...apiEmails];
+      const allEmails = [...serverMatches, ...localMatches, ...apiEmails];
       const uniqueEmails = allEmails.reduce((acc: Email[], current: Email) => {
         const x = acc.find(item => item.id === current.id);
         if (!x) {
