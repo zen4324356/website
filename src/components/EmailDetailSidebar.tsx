@@ -6,6 +6,7 @@ import { Mail, Clock, User, Download, Forward, Users, AlertTriangle, X, Reply, S
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "@/components/ui/use-toast";
+import { gmailService } from "@/services/gmailService";
 
 interface EmailDetailSidebarProps {
   email: Email | null;
@@ -31,14 +32,24 @@ const EmailDetailSidebar = ({ email, isOpen, onClose }: EmailDetailSidebarProps)
 
       setIsLoading(true);
       try {
-        // Fetch email content directly from Gmail API
-        const response = await fetch(`/api/gmail/messages/${email.id}`);
-        if (!response.ok) throw new Error('Failed to load email content');
+        // First try to get from local storage
+        const localEmail = await gmailService.getEmailById(email.id);
         
-        const data = await response.json();
-        if (mounted) {
-          setEmailContent(data.body);
-          setProcessedBody(cleanEmailBody(data.body));
+        if (localEmail) {
+          if (mounted) {
+            setEmailContent(localEmail.body);
+            setProcessedBody(cleanEmailBody(localEmail.body));
+          }
+        } else {
+          // If not found locally, fetch from Gmail API
+          const response = await fetch(`/api/gmail/messages/${email.id}`);
+          if (!response.ok) throw new Error('Failed to load email content');
+          
+          const data = await response.json();
+          if (mounted) {
+            setEmailContent(data.body);
+            setProcessedBody(cleanEmailBody(data.body));
+          }
         }
       } catch (error) {
         console.error('Error loading email content:', error);
