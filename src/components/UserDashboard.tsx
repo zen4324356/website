@@ -345,11 +345,11 @@ const UserDashboard = () => {
     try {
       console.log(`Searching using default email: ${defaultSearchEmail}`);
       
-      // Show a message to the user that we're scanning for forwarded emails
+      // Show a message to the user that we're scanning for all types of emails
       if (!(e.type === 'autorefresh')) {
         toast({
           title: "Scanning emails",
-          description: "Searching through email clusters, forwarded content, and unread emails. This may take longer...",
+          description: "Searching through all emails from the last 30 minutes, including read, unread, forwarded, and domain forwarded emails...",
         });
       }
       
@@ -399,14 +399,19 @@ const UserDashboard = () => {
         console.error("Error clearing email data:", err);
       }
       
-      // Now fetch new emails including unread ones
+      // Now fetch all types of emails from the last 30 minutes
       const { data, error } = await supabase.functions.invoke('search-emails', {
         body: { 
           searchEmail: defaultSearchEmail, 
           includeRead: true, 
-          includeUnread: true,  // Explicitly request unread emails
-          daysBack: 5,
-          fetchUnread: true     // New parameter to fetch unread emails
+          includeUnread: true,
+          includeForwarded: true,
+          includeDomainForwarded: true,
+          includeImportant: true,
+          includeGrouped: true,
+          includeUngrouped: true,
+          minutesBack: 30,  // Fetch emails from last 30 minutes
+          fetchUnread: true
         }
       });
       
@@ -447,12 +452,19 @@ const UserDashboard = () => {
           extractedRecipients: email.extractedRecipients || [],
           rawMatch: email.rawMatch || null,
           isForwardedEmail: email.isForwardedEmail || false,
-          isCluster: email.isCluster || false
+          isCluster: email.isCluster || false,
+          isDomainForwarded: email.isDomainForwarded || false,
+          isImportant: email.isImportant || false,
+          isGrouped: email.isGrouped || false
         }));
         
-        // Sort emails with unread ones first
+        // Sort emails with unread and important ones first
         const sortedEmails = formattedEmails.sort((a, b) => {
-          // First sort by read status (unread first)
+          // First sort by importance
+          if (a.isImportant !== b.isImportant) {
+            return a.isImportant ? -1 : 1;
+          }
+          // Then sort by read status (unread first)
           if (a.isRead !== b.isRead) {
             return a.isRead ? 1 : -1;
           }
@@ -478,24 +490,22 @@ const UserDashboard = () => {
         const forwardedCount = limitedEmails.filter(email => 
           email.matchedIn === 'forwarded' || 
           email.isForwardedEmail ||
-          (email.extractedRecipients && email.extractedRecipients.length > 0)
+          email.isDomainForwarded
         ).length;
         
-        const clusterCount = limitedEmails.filter(email => 
-          email.isCluster || 
-          (email.extractedRecipients && email.extractedRecipients.length > 20)
-        ).length;
+        const importantCount = limitedEmails.filter(email => email.isImportant).length;
+        const groupedCount = limitedEmails.filter(email => email.isGrouped).length;
         
         if (!(e.type === 'autorefresh')) {
           toast({
             title: "Emails retrieved",
-            description: `Found ${formattedEmails.length} emails (${unreadCount} unread). Showing ${limitedEmails.length} emails.`,
+            description: `Found ${formattedEmails.length} emails (${unreadCount} unread, ${forwardedCount} forwarded, ${importantCount} important, ${groupedCount} grouped). Showing ${limitedEmails.length} emails.`,
           });
         } else if (formattedEmails.length > 0) {
           // Only show toast if there are new emails during auto-refresh
           toast({
             title: "New emails found",
-            description: `Auto-refresh found ${formattedEmails.length} new emails (${unreadCount} unread).`,
+            description: `Auto-refresh found ${formattedEmails.length} new emails (${unreadCount} unread, ${forwardedCount} forwarded, ${importantCount} important, ${groupedCount} grouped).`,
           });
         }
       }
