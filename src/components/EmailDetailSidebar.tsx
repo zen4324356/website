@@ -27,18 +27,20 @@ const EmailDetailSidebar = ({ email, isOpen, onClose }: EmailDetailSidebarProps)
     let mounted = true;
 
     const loadEmailContent = async () => {
-      if (!email?.tempId || !isOpen) return;
+      if (!email?.id || !isOpen) return;
 
       setIsLoading(true);
       try {
-        const response = await fetch(`/api/emails/temp/${email.tempId}`);
+        // Fetch email content directly from Gmail API
+        const response = await fetch(`/api/gmail/messages/${email.id}`);
         if (!response.ok) throw new Error('Failed to load email content');
         
-        const content = await response.text();
+        const data = await response.json();
         if (mounted) {
-          setEmailContent(content);
+          setEmailContent(data.body);
+          setProcessedBody(cleanEmailBody(data.body));
         }
-    } catch (error) {
+      } catch (error) {
         console.error('Error loading email content:', error);
         toast({
           title: "Error",
@@ -56,68 +58,21 @@ const EmailDetailSidebar = ({ email, isOpen, onClose }: EmailDetailSidebarProps)
 
     return () => {
       mounted = false;
-      // Clean up temp file when closing
-      if (email?.tempId) {
-        fetch(`/api/emails/temp/${email.tempId}`, { method: 'DELETE' })
-          .catch(error => console.error('Error cleaning up temp email:', error));
-      }
     };
-  }, [email?.tempId, isOpen]);
-
-  useEffect(() => {
-    if (isOpen) {
-      setIsRendering(true);
-      setContentError(null);
-      setShowRawHeaders(false);
-      setShowSourceHtml(false);
-      
-      // Process the email body as soon as the sidebar opens
-      try {
-        if (email && email.body) {
-          // First, check if we need to initially download the email
-          if (email.rawContent) {
-            // We already have the raw content, process it
-            const cleaned = cleanEmailBody(email.body);
-            setProcessedBody(cleaned);
-          } else {
-            // Process what we have, but show a notice that more data is available
-            const cleaned = cleanEmailBody(email.body);
-            setProcessedBody(cleaned);
-            setContentError("Email content may be incomplete. You can download the full email to view all content.");
-          }
-        } else {
-          setContentError("No email content available");
-          setProcessedBody('<div class="p-4 text-red-500 font-medium">No email content available</div>');
-        }
-      } catch (err) {
-        console.error("Error processing email body:", err);
-        setContentError("Error processing email content");
-        setProcessedBody('<div class="p-4 text-red-500 font-medium">Error processing email content</div>');
-      }
-      
-      // Set a timer to finish rendering
-      const timer = setTimeout(() => {
-        setIsRendering(false);
-      }, 300);
-      return () => clearTimeout(timer);
-    }
-  }, [isOpen, email?.id, email?.body, email?.rawContent]);
+  }, [email?.id, isOpen]);
 
   const cleanEmailBody = (body: string) => {
     try {
-      // Check if the body is actually available
       if (!body || typeof body !== 'string') {
         setContentError("No email content available");
         return '<div class="p-4 text-red-500 font-medium">No email content available</div>';
       }
       
-      // Convert base64 content if needed
+      // Handle base64 encoded content
       if (body.startsWith("ey") || body.startsWith("PG")) {
         try {
-          // Try to decode as base64
           const decoded = atob(body.replace(/-/g, '+').replace(/_/g, '/'));
           if (decoded && decoded.length > 10) {
-            console.log("Successfully decoded base64 email content");
             body = decoded;
           }
         } catch (e) {
@@ -136,7 +91,6 @@ const EmailDetailSidebar = ({ email, isOpen, onClose }: EmailDetailSidebarProps)
             const boundary = boundaryMatch[1];
             const parts = body.split('--' + boundary);
             
-            // Look for HTML part first, then plain text
             let htmlPart = '';
             let plainTextPart = '';
             
@@ -166,12 +120,12 @@ const EmailDetailSidebar = ({ email, isOpen, onClose }: EmailDetailSidebarProps)
         }
       }
       
-      // If body is plain text, convert to HTML
+      // Convert plain text to HTML if needed
       if (!body.includes('<') || !body.includes('>')) {
         body = `<div style="white-space: pre-wrap; font-family: Arial, sans-serif; line-height: 1.6; color: #333;">${body.replace(/\n/g, '<br>')}</div>`;
       }
       
-      // Create a container for the email content
+      // Create container for email content
       let cleanedBody = `<div style="max-width: 100%; overflow-x: auto; word-wrap: break-word; padding: 20px; background-color: #fff; color: #333;">${body}</div>`;
       
       // Fix links
@@ -423,89 +377,55 @@ Original email may contain HTML content that could not be processed.`;
   if (!isOpen || !email) return null;
 
   return (
-    <div className="fixed right-0 top-0 h-screen w-[600px] bg-netflix-black border-l border-netflix-gray overflow-hidden flex flex-col">
-      {/* Header */}
-      <div className="p-4 border-b border-netflix-gray flex items-center justify-between bg-netflix-darkgray sticky top-0 z-10">
-        <div className="flex items-center gap-2">
-          <Mail className="h-5 w-5" />
-          <span className="font-semibold">Email View</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => setShowRawHtml(!showRawHtml)}
-            className="p-2 hover:bg-netflix-gray rounded-full"
-            title={showRawHtml ? "Show Formatted" : "Show Raw HTML"}
-          >
-            <Eye className="h-4 w-4" />
-          </button>
-          <button
-            onClick={onClose}
-            className="p-2 hover:bg-netflix-gray rounded-full"
-          >
-            <X className="h-5 w-5" />
-          </button>
-        </div>
-      </div>
-
-      {/* Action buttons */}
-      <div className="p-2 border-b border-netflix-gray flex gap-2 bg-netflix-darkgray sticky top-[64px] z-10">
-        <button className="p-2 hover:bg-netflix-gray rounded-full" title="Archive">
-          <Archive className="h-4 w-4" />
-        </button>
-        <button className="p-2 hover:bg-netflix-gray rounded-full" title="Delete">
-          <Trash2 className="h-4 w-4" />
-        </button>
-        <button className="p-2 hover:bg-netflix-gray rounded-full" title="Star">
-          <Star className="h-4 w-4" />
-        </button>
-        <button className="p-2 hover:bg-netflix-gray rounded-full" title="Reply">
-          <Reply className="h-4 w-4" />
-        </button>
-        <button className="p-2 hover:bg-netflix-gray rounded-full" title="Forward">
-          <Forward className="h-4 w-4" />
-        </button>
-      </div>
-
-      {/* Email content */}
-      <div className="flex-1 overflow-auto">
-        <div className="p-4">
-          {/* Subject */}
-          <h1 className="text-xl font-semibold mb-4">{email.subject}</h1>
-
-          {/* Sender info */}
-          <div className="flex items-start gap-3 mb-4 bg-netflix-darkgray p-3 rounded">
-            <div className="w-10 h-10 rounded-full bg-netflix-red flex items-center justify-center">
-              <span className="text-white font-semibold text-lg">
+    <Sheet open={isOpen} onOpenChange={onClose}>
+      <SheetContent className="w-[800px] sm:w-[800px]">
+        <SheetHeader>
+          <SheetTitle className="flex items-center gap-2">
+            <Mail className="h-5 w-5" />
+            <span>Email View</span>
+          </SheetTitle>
+        </SheetHeader>
+        
+        <div className="mt-4 space-y-4">
+          {/* Email header */}
+          <div className="flex items-start gap-3 p-4 bg-gray-100 rounded-lg">
+            <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center">
+              <span className="text-gray-600 font-semibold">
                 {email.from.charAt(0).toUpperCase()}
               </span>
             </div>
             <div>
-              <div className="font-semibold text-lg">{email.from}</div>
-              <div className="text-sm text-gray-400">
+              <div className="font-semibold">{email.from}</div>
+              <div className="text-sm text-gray-500">
                 to {email.to}
               </div>
-              <div className="text-sm text-gray-400">
+              <div className="text-sm text-gray-500">
                 {new Date(email.date).toLocaleString()}
               </div>
             </div>
           </div>
 
-          {/* Email body */}
-          <div className="mt-4 bg-netflix-darkgray p-4 rounded">
-            {showRawHtml ? (
-              <pre className="whitespace-pre-wrap text-sm font-mono overflow-x-auto">
-                {email.body}
-              </pre>
+          {/* Email subject */}
+          <h1 className="text-xl font-semibold px-4">{email.subject}</h1>
+
+          {/* Email content */}
+          <div className="mt-4">
+            {isLoading ? (
+              <div className="flex items-center justify-center p-8">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+              </div>
+            ) : contentError ? (
+              <div className="p-4 text-red-500 font-medium">{contentError}</div>
             ) : (
               <div 
                 className="prose prose-invert max-w-none email-content"
-                dangerouslySetInnerHTML={{ __html: renderEmailContent() }}
+                dangerouslySetInnerHTML={{ __html: processedBody }}
               />
             )}
           </div>
         </div>
-      </div>
-    </div>
+      </SheetContent>
+    </Sheet>
   );
 };
 
