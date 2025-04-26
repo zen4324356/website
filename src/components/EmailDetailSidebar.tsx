@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Email } from "@/types";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Mail, Clock, User, Download, Forward, Users, AlertTriangle } from "lucide-react";
+import { Mail, Clock, User, Download, Forward, Users, AlertTriangle, X, Reply, Star, Archive, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "@/components/ui/use-toast";
@@ -472,12 +472,18 @@ Original email may contain HTML content that could not be processed.`;
     }
   };
 
+  if (!isOpen || !email) return null;
+
   return (
-    <div className="fixed inset-y-0 right-0 w-full md:w-1/2 lg:w-1/3 bg-netflix-black border-l border-netflix-lightgray overflow-y-auto z-50 content-card">
-      <div className="sticky top-0 z-10 p-4 bg-netflix-darkgray border-b border-netflix-lightgray flex justify-between items-center content-card">
-        <h2 className="text-xl font-semibold text-over-video">Email Details</h2>
-        <button 
-          onClick={onClose} 
+    <div className="fixed right-0 top-0 h-screen w-[400px] bg-netflix-black border-l border-netflix-gray overflow-hidden flex flex-col">
+      {/* Header */}
+      <div className="p-4 border-b border-netflix-gray flex items-center justify-between bg-netflix-darkgray">
+        <div className="flex items-center gap-2">
+          <Mail className="h-5 w-5" />
+          <span className="font-semibold">Email View</span>
+        </div>
+        <button
+          onClick={onClose}
           className="netflix-button button-over-video">
           Close
         </button>

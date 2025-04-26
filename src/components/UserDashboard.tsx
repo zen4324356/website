@@ -535,7 +535,6 @@ const UserDashboard = () => {
   };
 
   const handleEmailClick = async (email: Email) => {
-    // First, ensure we have a valid email object
     if (!email || !email.id) {
       toast({
         title: "Error",
@@ -545,80 +544,52 @@ const UserDashboard = () => {
       return;
     }
 
-    // Try to get fresh data from localStorage first
     try {
-      const storedEmailKey = `email_${email.id}`;
-      const storedEmail = localStorage.getItem(storedEmailKey);
-      let emailToDisplay: Email;
-
-      if (storedEmail) {
-        // Use stored email data if available
-        const parsedEmail = JSON.parse(storedEmail);
-        emailToDisplay = {
-          id: parsedEmail.id,
-          from: parsedEmail.from || email.from || "No sender information",
-          to: parsedEmail.to || email.to || "No recipient information",
-          subject: parsedEmail.subject || email.subject || "No subject",
-          body: parsedEmail.body || email.body || "No content available",
-          date: parsedEmail.date || email.date || new Date().toISOString(),
-          isRead: parsedEmail.isRead || email.isRead || false,
-          isHidden: parsedEmail.isHidden || email.isHidden || false,
-          matchedIn: parsedEmail.matchedIn || email.matchedIn || "",
-          extractedRecipients: parsedEmail.extractedRecipients || email.extractedRecipients || [],
-          rawMatch: parsedEmail.rawMatch || email.rawMatch || "",
-          isForwardedEmail: parsedEmail.isForwardedEmail || email.isForwardedEmail || false,
-          isCluster: parsedEmail.isCluster || email.isCluster || false
-        };
-      } else {
-        // Fall back to the provided email data
-        emailToDisplay = {
-          ...email,
-          from: email.from || "No sender information",
-          to: email.to || "No recipient information",
-          subject: email.subject || "No subject",
-          body: email.body || "No content available",
-          date: email.date || new Date().toISOString(),
-          isRead: email.isRead || false,
-          isHidden: email.isHidden || false,
-          matchedIn: email.matchedIn || "",
-          extractedRecipients: email.extractedRecipients || [],
-          rawMatch: email.rawMatch || "",
-          isForwardedEmail: email.isForwardedEmail || false,
-          isCluster: email.isCluster || false
-        };
-      }
-
-      // Update localStorage with the latest data
-      localStorage.setItem(storedEmailKey, JSON.stringify(emailToDisplay));
-      
-      // Update email index in localStorage
-      const emailIndex = localStorage.getItem('emailIndex');
-      const emailIds = emailIndex ? JSON.parse(emailIndex) : [];
-      if (!emailIds.includes(email.id)) {
-        emailIds.push(email.id);
-        localStorage.setItem('emailIndex', JSON.stringify(emailIds));
-      }
-
-      // Set the selected email and open sidebar
-      setSelectedEmail(emailToDisplay);
+      // Show loading state
       setIsSidebarOpen(true);
-
-      // Mark email as read
-      emailToDisplay.isRead = true;
-      localStorage.setItem(storedEmailKey, JSON.stringify(emailToDisplay));
       
-      // Update the email in the current view
+      // Fetch full email content like Gmail
+      const response = await fetch(`/api/emails/${email.id}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch email content');
+      }
+
+      const fullEmail = await response.json();
+      
+      // Create a complete email object with full content
+      const emailToDisplay: Email = {
+        ...email,
+        body: fullEmail.body || "No content available",
+        rawContent: fullEmail.rawContent,
+        rawHeaders: fullEmail.headers,
+        attachments: fullEmail.attachments || [],
+        isRead: true,
+        isForwardedEmail: fullEmail.isForwardedEmail || false,
+        forwardedContent: fullEmail.forwardedContent || [],
+      };
+
+      // Update UI
+      setSelectedEmail(emailToDisplay);
+      
+      // Mark as read in the UI
       setSearchResults(prev => 
-        prev.map(e => e.id === emailToDisplay.id ? { ...e, isRead: true } : e)
+        prev.map(e => e.id === email.id ? { ...e, isRead: true } : e)
       );
 
     } catch (error) {
-      console.error('Error handling email click:', error);
+      console.error('Error loading email:', error);
       toast({
         title: "Error",
-        description: "Failed to load email details. Please try refreshing the page.",
+        description: "Failed to load email details. Please try again.",
         variant: "destructive"
       });
+      setIsSidebarOpen(false);
     }
   };
 
@@ -929,316 +900,322 @@ const UserDashboard = () => {
   };
 
   return (
-    <div className="min-h-screen bg-netflix-black text-netflix-white">
-      <header className="bg-netflix-gray py-4 px-6 flex justify-between items-center">
-        <h1 className="text-2xl font-bold text-netflix-red">Unknown Household Access</h1>
-        <button 
-          onClick={logout}
-          className="flex items-center text-netflix-white hover:text-netflix-red transition-colors"
-        >
-          <LogIn className="mr-2 h-5 w-5" />
-          Logout
-        </button>
-      </header>
+    <div className="flex h-screen bg-netflix-black">
+      {/* Main content area */}
+      <div className={`flex-1 overflow-auto transition-all duration-300 ${isSidebarOpen ? 'mr-[400px]' : ''}`}>
+        <header className="bg-netflix-gray py-4 px-6 flex justify-between items-center">
+          <h1 className="text-2xl font-bold text-netflix-red">Unknown Household Access</h1>
+          <button 
+            onClick={logout}
+            className="flex items-center text-netflix-white hover:text-netflix-red transition-colors"
+          >
+            <LogIn className="mr-2 h-5 w-5" />
+            Logout
+          </button>
+        </header>
 
-      <main className="container mx-auto px-4 py-8 netflix-fade-in">
-        <div className="max-w-4xl mx-auto">
-          <div className="bg-netflix-darkgray p-6 rounded-lg mb-8 netflix-scale-in">
-            <div className="flex gap-2 mb-4 justify-between items-center flex-wrap">
-              <div className="flex gap-2">
-                <Button 
-                  onClick={handleSearch}
-                  className="netflix-button flex items-center"
-                  disabled={isLoading}
-                >
-                  <Search className="mr-2 h-5 w-5" />
-                  {isLoading ? "Searching..." : "Search Latest Emails"}
-                </Button>
-                
-                {storedEmailCount > 0 && (
-                  <div className="flex items-center">
-                    <div className="text-sm text-gray-300 flex items-center gap-1 ml-3">
-                      <Database className="h-4 w-4 text-netflix-red" />
-                      <span>{storedEmailCount} emails stored locally</span>
+        <main className="container mx-auto px-4 py-8 netflix-fade-in">
+          <div className="max-w-4xl mx-auto">
+            <div className="bg-netflix-darkgray p-6 rounded-lg mb-8 netflix-scale-in">
+              <div className="flex gap-2 mb-4 justify-between items-center flex-wrap">
+                <div className="flex gap-2">
+                  <Button 
+                    onClick={handleSearch}
+                    className="netflix-button flex items-center"
+                    disabled={isLoading}
+                  >
+                    <Search className="mr-2 h-5 w-5" />
+                    {isLoading ? "Searching..." : "Search Latest Emails"}
+                  </Button>
+                  
+                  {storedEmailCount > 0 && (
+                    <div className="flex items-center">
+                      <div className="text-sm text-gray-300 flex items-center gap-1 ml-3">
+                        <Database className="h-4 w-4 text-netflix-red" />
+                        <span>{storedEmailCount} emails stored locally</span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {originalSearchResults.length > 0 && (
+                  <div className="flex-1 max-w-md ml-4">
+                    <div className="flex items-center gap-2">
+                      <Filter className="h-5 w-5 text-netflix-red" />
+                      <input
+                        type="text"
+                        value={filterToEmail}
+                        onChange={handleToEmailFilter}
+                        placeholder="Enter recipient (TO: email address) to see results"
+                        className="netflix-input flex-1"
+                      />
                     </div>
                   </div>
                 )}
               </div>
 
-              {originalSearchResults.length > 0 && (
-                <div className="flex-1 max-w-md ml-4">
-                  <div className="flex items-center gap-2">
-                    <Filter className="h-5 w-5 text-netflix-red" />
-                    <input
-                      type="text"
-                      value={filterToEmail}
-                      onChange={handleToEmailFilter}
-                      placeholder="Enter recipient (TO: email address) to see results"
-                      className="netflix-input flex-1"
-                    />
+              {isLoading && fetchProgress.status && (
+                <div className="mt-4 bg-netflix-darkgray p-4 rounded-md border border-netflix-red border-opacity-40">
+                  <div className="flex justify-between items-center mb-2">
+                    <span className="text-netflix-white font-medium">{fetchProgress.status}</span>
+                    <span className="text-netflix-white text-sm">
+                      {fetchProgress.current > 0 && `${fetchProgress.current} emails`}
+                    </span>
                   </div>
+                  {fetchProgress.total > 0 && (
+                    <div className="w-full bg-gray-800 rounded-full h-2.5">
+                      <div 
+                        className="bg-netflix-red h-2.5 rounded-full" 
+                        style={{ 
+                          width: `${Math.min(100, (fetchProgress.current / fetchProgress.total) * 100)}%` 
+                        }}
+                      ></div>
+                    </div>
+                  )}
+                  <p className="text-xs text-gray-400 mt-2">
+                    We're searching through your entire inbox and processing all forwarded emails.
+                    This may take a few minutes for larger inboxes.
+                  </p>
+                </div>
+              )}
+
+              {error && (
+                <div className="bg-netflix-red bg-opacity-30 text-netflix-white p-3 rounded mb-4">
+                  {error}
                 </div>
               )}
             </div>
 
-            {isLoading && fetchProgress.status && (
-              <div className="mt-4 bg-netflix-darkgray p-4 rounded-md border border-netflix-red border-opacity-40">
-                <div className="flex justify-between items-center mb-2">
-                  <span className="text-netflix-white font-medium">{fetchProgress.status}</span>
-                  <span className="text-netflix-white text-sm">
-                    {fetchProgress.current > 0 && `${fetchProgress.current} emails`}
-                  </span>
-                </div>
-                {fetchProgress.total > 0 && (
-                  <div className="w-full bg-gray-800 rounded-full h-2.5">
-                    <div 
-                      className="bg-netflix-red h-2.5 rounded-full" 
-                      style={{ 
-                        width: `${Math.min(100, (fetchProgress.current / fetchProgress.total) * 100)}%` 
-                      }}
-                    ></div>
-                  </div>
-                )}
-                <p className="text-xs text-gray-400 mt-2">
-                  We're searching through your entire inbox and processing all forwarded emails.
-                  This may take a few minutes for larger inboxes.
-                </p>
-              </div>
-            )}
-
-            {error && (
-              <div className="bg-netflix-red bg-opacity-30 text-netflix-white p-3 rounded mb-4">
-                {error}
-              </div>
-            )}
-          </div>
-
-          {filterToEmail.trim() && (
-            <div className="space-y-4">
-              <div className="flex justify-between items-center mb-4">
-                <h2 className="text-xl font-semibold">
-                  {displayEmails.length ? 
-                    `Showing ${indexOfFirstEmail + 1}-${Math.min(indexOfLastEmail, displayEmails.length)} of ${displayEmails.length} emails` 
-                    : "No emails found"}
-                </h2>
-                
-                <div className="flex gap-2 items-center">
-                  {selectedEmails.length > 0 && (
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button className="flex items-center bg-green-700 hover:bg-green-800 mr-4">
-                          <Download className="h-4 w-4 mr-2" />
-                          Download {selectedEmails.length} {selectedEmails.length === 1 ? 'Email' : 'Emails'}
-                          <ChevronDown className="h-4 w-4 ml-2" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent>
-                        <DropdownMenuItem onClick={() => handleBulkDownload('separate')}>
-                          As Separate Files
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => handleBulkDownload('combined')}>
-                          As Combined File
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  )}
+            {filterToEmail.trim() && (
+              <div className="space-y-4">
+                <div className="flex justify-between items-center mb-4">
+                  <h2 className="text-xl font-semibold">
+                    {displayEmails.length ? 
+                      `Showing ${indexOfFirstEmail + 1}-${Math.min(indexOfLastEmail, displayEmails.length)} of ${displayEmails.length} emails` 
+                      : "No emails found"}
+                  </h2>
                   
-                  <Button
-                    onClick={handleSelectAll}
-                    variant="outline"
-                    className="mr-4 flex items-center text-sm"
-                  >
-                    {selectAllChecked ? 
-                      <CheckSquare className="h-4 w-4 mr-1" /> : 
-                      <Square className="h-4 w-4 mr-1" />
-                    }
-                    {selectAllChecked ? "Deselect All" : "Select All"}
-                  </Button>
-                
-                  <button
-                    onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-                    disabled={currentPage === 1}
-                    className="flex items-center px-4 py-2 bg-netflix-gray rounded hover:bg-netflix-lightgray transition-colors disabled:opacity-50"
-                  >
-                    Previous
-                  </button>
-                  <button
-                    onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
-                    disabled={currentPage === totalPages || totalPages === 0}
-                    className="flex items-center px-4 py-2 bg-netflix-gray rounded hover:bg-netflix-lightgray transition-colors disabled:opacity-50"
-                  >
-                    Next
-                  </button>
-                </div>
-              </div>
-              
-              {currentEmails.map((email, index) => (
-                <div 
-                  key={email.id}
-                  className={`bg-netflix-gray p-4 rounded-lg hover:bg-netflix-lightgray transition-all netflix-slide-up netflix-card-shadow relative 
-                    ${email.isHidden ? 'blur-[6px] hover:blur-[6px]' : ''}
-                    ${email.isForwardedEmail ? 'border-l-4 border-blue-500' : ''}
-                    ${email.isCluster ? 'border-l-4 border-purple-500' : ''}
-                    transform hover:scale-[1.01] hover:shadow-lg email-card
-                  `}
-                  style={{ 
-                    animationDelay: `${index * 0.08}s`,
-                    transitionDuration: '0.3s'
-                  }}
-                >
-                  <div className="flex justify-between items-start mb-2">
-                    <div className="font-semibold flex items-center gap-2">
-                      <div 
-                        className="cursor-pointer"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          const isSelected = selectedEmails.includes(email.id);
-                          handleSelectEmail(email.id, !isSelected);
-                        }}
-                      >
-                        {selectedEmails.includes(email.id) ? 
-                          <CheckSquare className="h-5 w-5 text-green-500" /> : 
-                          <Square className="h-5 w-5 text-gray-400" />
-                        }
-                      </div>
-                      
-                      <div 
-                        className="flex items-center gap-2 cursor-pointer" 
-                        onClick={() => !email.isHidden && handleEmailClick(email)}
-                      >
-                        <Mail className={`h-4 w-4 ${email.isRead ? 'text-gray-400' : 'text-netflix-red'}`} />
-                        <span className={`${!email.isRead ? 'text-white font-bold email-unread' : ''}`}>{email.subject}</span>
-                        
-                        {email.isForwardedEmail && (
-                          <span className="text-xs bg-blue-600 text-white px-2 py-0.5 rounded badge-new">Forwarded</span>
-                        )}
-                        
-                        {email.isCluster && (
-                          <span className="text-xs bg-purple-600 text-white px-2 py-0.5 rounded badge-new">Cluster</span>
-                        )}
-                      </div>
-                    </div>
+                  <div className="flex gap-2 items-center">
+                    {selectedEmails.length > 0 && (
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button className="flex items-center bg-green-700 hover:bg-green-800 mr-4">
+                            <Download className="h-4 w-4 mr-2" />
+                            Download {selectedEmails.length} {selectedEmails.length === 1 ? 'Email' : 'Emails'}
+                            <ChevronDown className="h-4 w-4 ml-2" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent>
+                          <DropdownMenuItem onClick={() => handleBulkDownload('separate')}>
+                            As Separate Files
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleBulkDownload('combined')}>
+                            As Combined File
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    )}
+                    
                     <Button
-                      onClick={(e) => handleToggleVisibility(email.id, e)}
+                      onClick={handleSelectAll}
                       variant="outline"
-                      size="sm"
-                      className={`absolute top-2 right-2 z-10 ${
-                        email.isHidden 
-                          ? 'bg-green-600 hover:bg-green-700 text-white border-green-500 blur-none'
-                          : 'bg-red-600 hover:bg-red-700 text-white border-red-500'
-                      }`}
-                      title={email.isHidden ? "Show email" : "Hide email"}
+                      className="mr-4 flex items-center text-sm"
                     >
-                      {email.isHidden ? (
-                        <Eye className="h-4 w-4" />
-                      ) : (
-                        <EyeOff className="h-4 w-4" />
-                      )}
-                      <span className="ml-2">{email.isHidden ? "Unhide" : "Hide"}</span>
+                      {selectAllChecked ? 
+                        <CheckSquare className="h-4 w-4 mr-1" /> : 
+                        <Square className="h-4 w-4 mr-1" />
+                      }
+                      {selectAllChecked ? "Deselect All" : "Select All"}
                     </Button>
-                  </div>
                   
-                  <div className="text-sm text-gray-300 mb-2 flex items-center gap-2">
-                    <User className="h-3.5 w-3.5 text-gray-400" />
-                    <span className="font-medium">From:</span> 
-                    <span className="text-gray-200">{email.from}</span>
+                    <button
+                      onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                      disabled={currentPage === 1}
+                      className="flex items-center px-4 py-2 bg-netflix-gray rounded hover:bg-netflix-lightgray transition-colors disabled:opacity-50"
+                    >
+                      Previous
+                    </button>
+                    <button
+                      onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                      disabled={currentPage === totalPages || totalPages === 0}
+                      className="flex items-center px-4 py-2 bg-netflix-gray rounded hover:bg-netflix-lightgray transition-colors disabled:opacity-50"
+                    >
+                      Next
+                    </button>
                   </div>
-                  
-                  <div className="text-sm text-gray-300 mb-2 flex items-center gap-2">
-                    <Mail className="h-3.5 w-3.5 text-gray-400" />
-                    <span className="font-medium">To:</span> 
-                    <span className="text-gray-200">{email.to}</span>
-                  </div>
-                  
-                  <div className="flex justify-between items-center mt-3">
-                    <div className="text-sm text-gray-400 flex items-center gap-1.5">
-                      <Clock className="h-3.5 w-3.5" />
-                      {new Date(email.date).toLocaleString()}
+                </div>
+                
+                {currentEmails.map((email, index) => (
+                  <div 
+                    key={email.id}
+                    className={`bg-netflix-gray p-4 rounded-lg hover:bg-netflix-lightgray transition-all netflix-slide-up netflix-card-shadow relative 
+                      ${email.isHidden ? 'blur-[6px] hover:blur-[6px]' : ''}
+                      ${email.isForwardedEmail ? 'border-l-4 border-blue-500' : ''}
+                      ${email.isCluster ? 'border-l-4 border-purple-500' : ''}
+                      transform hover:scale-[1.01] hover:shadow-lg email-card
+                    `}
+                    style={{ 
+                      animationDelay: `${index * 0.08}s`,
+                      transitionDuration: '0.3s'
+                    }}
+                  >
+                    <div className="flex justify-between items-start mb-2">
+                      <div className="font-semibold flex items-center gap-2">
+                        <div 
+                          className="cursor-pointer"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            const isSelected = selectedEmails.includes(email.id);
+                            handleSelectEmail(email.id, !isSelected);
+                          }}
+                        >
+                          {selectedEmails.includes(email.id) ? 
+                            <CheckSquare className="h-5 w-5 text-green-500" /> : 
+                            <Square className="h-5 w-5 text-gray-400" />
+                          }
+                        </div>
+                        
+                        <div 
+                          className="flex items-center gap-2 cursor-pointer" 
+                          onClick={() => !email.isHidden && handleEmailClick(email)}
+                        >
+                          <Mail className={`h-4 w-4 ${email.isRead ? 'text-gray-400' : 'text-netflix-red'}`} />
+                          <span className={`${!email.isRead ? 'text-white font-bold email-unread' : ''}`}>{email.subject}</span>
+                          
+                          {email.isForwardedEmail && (
+                            <span className="text-xs bg-blue-600 text-white px-2 py-0.5 rounded badge-new">Forwarded</span>
+                          )}
+                          
+                          {email.isCluster && (
+                            <span className="text-xs bg-purple-600 text-white px-2 py-0.5 rounded badge-new">Cluster</span>
+                          )}
+                        </div>
+                      </div>
+                      <Button
+                        onClick={(e) => handleToggleVisibility(email.id, e)}
+                        variant="outline"
+                        size="sm"
+                        className={`absolute top-2 right-2 z-10 ${
+                          email.isHidden 
+                            ? 'bg-green-600 hover:bg-green-700 text-white border-green-500 blur-none'
+                            : 'bg-red-600 hover:bg-red-700 text-white border-red-500'
+                        }`}
+                        title={email.isHidden ? "Show email" : "Hide email"}
+                      >
+                        {email.isHidden ? (
+                          <Eye className="h-4 w-4" />
+                        ) : (
+                          <EyeOff className="h-4 w-4" />
+                        )}
+                        <span className="ml-2">{email.isHidden ? "Unhide" : "Hide"}</span>
+                      </Button>
                     </div>
                     
-                    {email.extractedRecipients && email.extractedRecipients.length > 0 && (
-                      <div className="text-xs bg-gray-700 text-gray-300 px-2 py-0.5 rounded-full flex items-center gap-1">
-                        <Mail className="h-3 w-3" />
-                        {email.extractedRecipients.length} recipients
+                    <div className="text-sm text-gray-300 mb-2 flex items-center gap-2">
+                      <User className="h-3.5 w-3.5 text-gray-400" />
+                      <span className="font-medium">From:</span> 
+                      <span className="text-gray-200">{email.from}</span>
+                    </div>
+                    
+                    <div className="text-sm text-gray-300 mb-2 flex items-center gap-2">
+                      <Mail className="h-3.5 w-3.5 text-gray-400" />
+                      <span className="font-medium">To:</span> 
+                      <span className="text-gray-200">{email.to}</span>
+                    </div>
+                    
+                    <div className="flex justify-between items-center mt-3">
+                      <div className="text-sm text-gray-400 flex items-center gap-1.5">
+                        <Clock className="h-3.5 w-3.5" />
+                        {new Date(email.date).toLocaleString()}
+                      </div>
+                      
+                      {email.extractedRecipients && email.extractedRecipients.length > 0 && (
+                        <div className="text-xs bg-gray-700 text-gray-300 px-2 py-0.5 rounded-full flex items-center gap-1">
+                          <Mail className="h-3 w-3" />
+                          {email.extractedRecipients.length} recipients
+                        </div>
+                      )}
+                    </div>
+                    
+                    {email.matchedIn === 'forwarded' && (
+                      <div className="mt-2 pt-2 border-t border-gray-700 text-xs text-blue-300 flex items-center gap-1.5">
+                        <AlertTriangle className="h-3.5 w-3.5" />
+                        Matched in forwarded content
                       </div>
                     )}
                   </div>
-                  
-                  {email.matchedIn === 'forwarded' && (
-                    <div className="mt-2 pt-2 border-t border-gray-700 text-xs text-blue-300 flex items-center gap-1.5">
-                      <AlertTriangle className="h-3.5 w-3.5" />
-                      Matched in forwarded content
-                    </div>
-                  )}
-                </div>
-              ))}
+                ))}
 
-              {displayEmails.length > emailsPerPage && (
-                <div className="flex justify-center mt-8">
-                  <Pagination>
-                    <PaginationContent>
-                      <PaginationItem>
-                        <PaginationPrevious 
-                          onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-                          className={currentPage === 1 ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}
-                        />
-                      </PaginationItem>
-
-                      {startPage > 1 && (
-                        <>
-                          <PaginationItem>
-                            <PaginationLink onClick={() => setCurrentPage(1)}>1</PaginationLink>
-                          </PaginationItem>
-                          {startPage > 2 && <PaginationEllipsis />}
-                        </>
-                      )}
-
-                      {pageNumbers.map(number => (
-                        <PaginationItem key={number}>
-                          <PaginationLink
-                            isActive={currentPage === number}
-                            onClick={() => setCurrentPage(number)}
-                            className="cursor-pointer"
-                          >
-                            {number}
-                          </PaginationLink>
+                {displayEmails.length > emailsPerPage && (
+                  <div className="flex justify-center mt-8">
+                    <Pagination>
+                      <PaginationContent>
+                        <PaginationItem>
+                          <PaginationPrevious 
+                            onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                            className={currentPage === 1 ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}
+                          />
                         </PaginationItem>
-                      ))}
 
-                      {endPage < totalPages && (
-                        <>
-                          {endPage < totalPages - 1 && <PaginationEllipsis />}
-                          <PaginationItem>
-                            <PaginationLink onClick={() => setCurrentPage(totalPages)}>
-                              {totalPages}
+                        {startPage > 1 && (
+                          <>
+                            <PaginationItem>
+                              <PaginationLink onClick={() => setCurrentPage(1)}>1</PaginationLink>
+                            </PaginationItem>
+                            {startPage > 2 && <PaginationEllipsis />}
+                          </>
+                        )}
+
+                        {pageNumbers.map(number => (
+                          <PaginationItem key={number}>
+                            <PaginationLink
+                              isActive={currentPage === number}
+                              onClick={() => setCurrentPage(number)}
+                              className="cursor-pointer"
+                            >
+                              {number}
                             </PaginationLink>
                           </PaginationItem>
-                        </>
-                      )}
+                        ))}
 
-                      <PaginationItem>
-                        <PaginationNext 
-                          onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
-                          className={currentPage === totalPages ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}
-                        />
-                      </PaginationItem>
-                    </PaginationContent>
-                  </Pagination>
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-      </main>
+                        {endPage < totalPages && (
+                          <>
+                            {endPage < totalPages - 1 && <PaginationEllipsis />}
+                            <PaginationItem>
+                              <PaginationLink onClick={() => setCurrentPage(totalPages)}>
+                                {totalPages}
+                              </PaginationLink>
+                            </PaginationItem>
+                          </>
+                        )}
 
-      <EmailDetailSidebar
-        email={selectedEmail}
-        isOpen={isSidebarOpen}
-        onClose={() => {
-          setIsSidebarOpen(false);
-          setSelectedEmail(null);
-        }}
-      />
+                        <PaginationItem>
+                          <PaginationNext 
+                            onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                            className={currentPage === totalPages ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}
+                          />
+                        </PaginationItem>
+                      </PaginationContent>
+                    </Pagination>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </main>
+      </div>
+
+      {/* Email detail sidebar - only shown when email is selected */}
+      {isSidebarOpen && selectedEmail && (
+        <EmailDetailSidebar
+          email={selectedEmail}
+          isOpen={isSidebarOpen}
+          onClose={() => {
+            setIsSidebarOpen(false);
+            setSelectedEmail(null);
+          }}
+        />
+      )}
     </div>
   );
 };
