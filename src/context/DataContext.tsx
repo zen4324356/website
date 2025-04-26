@@ -622,7 +622,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       if (error) {
         console.error('Error getting server storage stats:', error);
-        throw error;
+        return;
       }
 
       if (!data) {
@@ -637,7 +637,10 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
           .select()
           .single();
 
-        if (insertError) throw insertError;
+        if (insertError) {
+          console.error('Error creating initial stats:', insertError);
+          return;
+        }
         data = newData;
       }
 
@@ -648,11 +651,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       });
     } catch (error) {
       console.error('Error in getServerStorageStats:', error);
-      toast({
-        title: "Error",
-        description: "Failed to get server storage statistics. Please try again.",
-        variant: "destructive"
-      });
+      // Silently handle the error without showing toast
     }
   };
 
@@ -748,23 +747,14 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
         if (error) {
           console.error('Error saving emails to server:', error);
-          toast({
-            title: "Error",
-            description: "Failed to save emails to server storage",
-            variant: "destructive"
-          });
+          return;
         }
       }
 
-      // Update server storage stats
+      // Update server storage stats silently
       await updateServerStorageStats();
     } catch (error) {
       console.error('Error in saveEmailsToServer:', error);
-      toast({
-        title: "Error",
-        description: "Failed to save emails to server storage",
-        variant: "destructive"
-      });
     }
   };
 
@@ -776,14 +766,20 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         .from('server_emails')
         .select('*', { count: 'exact', head: true });
 
-      if (countError) throw countError;
+      if (countError) {
+        console.error('Error counting emails:', countError);
+        return;
+      }
 
       // Calculate storage size
       const { data: emails, error: dataError } = await supabase
         .from('server_emails')
         .select('email_data');
 
-      if (dataError) throw dataError;
+      if (dataError) {
+        console.error('Error fetching emails for size calculation:', dataError);
+        return;
+      }
 
       const totalSize = emails.reduce((acc, email) => {
         return acc + JSON.stringify(email.email_data).length;
@@ -800,7 +796,10 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
           last_updated: new Date().toISOString()
         });
 
-      if (updateError) throw updateError;
+      if (updateError) {
+        console.error('Error updating stats:', updateError);
+        return;
+      }
 
       // Update local state
       setServerStorageStats({
@@ -810,11 +809,6 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       });
     } catch (error) {
       console.error('Error updating server storage stats:', error);
-      toast({
-        title: "Error",
-        description: "Failed to update server storage statistics",
-        variant: "destructive"
-      });
     }
   };
 
