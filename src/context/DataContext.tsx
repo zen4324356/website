@@ -3,8 +3,14 @@ import { DataContextType, User, GoogleAuthConfig, Email, Admin } from "@/types";
 import { v4 as uuidv4 } from "@/utils/uuid";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/components/ui/use-toast";
+import sanitizeHtml from "sanitize-html";
 
 const DataContext = createContext<DataContextType | undefined>(undefined);
+
+interface SearchConfig {
+  maxResults: number;  // Configurable via admin panel
+  includeOldEmails: boolean;
+}
 
 export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   // Access Tokens
@@ -25,6 +31,12 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Auto-refresh settings
   const [autoRefreshInterval, setAutoRefreshInterval] = useState<number>(60000); // 1 minute default
   const [autoRefreshEnabled, setAutoRefreshEnabled] = useState<boolean>(true);
+
+  // Search config
+  const [searchConfig, setSearchConfig] = useState<SearchConfig>({
+    maxResults: 10,  // Default value, can be changed from admin panel
+    includeOldEmails: true
+  });
 
   // Load data from Supabase on mount
   useEffect(() => {
@@ -422,35 +434,58 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Email operations
   const searchEmails = async (searchQuery: string): Promise<Email[]> => {
     try {
-      // Always fetch emails from the default email first
+      setIsLoading(true);
+      
+      // Search both new and old emails
       const { data, error } = await supabase.functions.invoke('search-emails', {
-        body: { searchEmail: defaultSearchEmail }
+        body: { 
+          searchEmail: defaultSearchEmail,
+          query: searchQuery,
+          maxResults: searchConfig.maxResults,
+          includeOldEmails: searchConfig.includeOldEmails
+        }
       });
 
       if (error) throw new Error(error.message);
       if (data.error) throw new Error(data.error);
 
       if (data.emails && Array.isArray(data.emails)) {
-        const formattedEmails: Email[] = data.emails.map((email: any) => ({
-          id: email.id,
-          from: email.from,
-          to: email.to,
-          subject: email.subject,
-          body: email.body,
-          date: email.date,
-          isRead: email.isRead,
-          isHidden: false
-        }));
+        // Group emails by sender
+        const emailsBySender = data.emails.reduce((acc: { [key: string]: Email[] }, email: any) => {
+          const sender = email.from.toLowerCase();
+          if (!acc[sender]) {
+            acc[sender] = [];
+          }
+          acc[sender].push({
+            id: email.id,
+            from: email.from,
+            to: email.to,
+            subject: email.subject,
+            body: email.snippet || email.body,  // Use snippet for list view
+            date: email.date,
+            isRead: email.isRead,
+            isHidden: false,
+            threadId: email.threadId,
+            hasFullContent: false  // Flag to indicate if full content is downloaded
+          });
+          return acc;
+        }, {});
 
-        // Filter emails based on user's search query
-        const filteredEmails = formattedEmails.filter(email => 
-          email.to.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          email.from.toLowerCase().includes(searchQuery.toLowerCase())
+        // Get latest email from each sender
+        const latestEmails = Object.values(emailsBySender).map(emails => {
+          // Sort by date descending and take the first one
+          return emails.sort((a, b) => 
+            new Date(b.date).getTime() - new Date(a.date).getTime()
+          )[0];
+        });
+
+        // Sort final results by date
+        const sortedEmails = latestEmails.sort((a, b) => 
+          new Date(b.date).getTime() - new Date(a.date).getTime()
         );
 
-        // Use the current email limit from state to limit results
-        const limitedEmails = filteredEmails.slice(0, emailLimit);
-        return limitedEmails;
+        // Limit results based on admin config
+        return sortedEmails.slice(0, searchConfig.maxResults);
       }
 
       return [];
@@ -462,6 +497,8 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         variant: "destructive"
       });
       return [];
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -533,6 +570,66 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     });
   };
 
+  // Function to get full email content
+  const getFullEmailContent = async (emailId: string): Promise<Email | null> => {
+    try {
+      // First check if we have it in localStorage
+      const cachedEmail = localStorage.getItem(`email_${emailId}`);
+      if (cachedEmail) {
+        return JSON.parse(cachedEmail);
+      }
+
+      // If not in cache, fetch from API
+      const { data, error } = await supabase.functions.invoke('get-email-content', {
+        body: { 
+          emailId,
+          format: 'full'
+        }
+      });
+
+      if (error) throw new Error(error.message);
+      if (data.error) throw new Error(data.error);
+
+      if (data.email) {
+        // Format the email content
+        const formattedEmail = {
+          ...data.email,
+          hasFullContent: true,
+          formattedBody: formatEmailContent(data.email.body, data.email.contentType)
+        };
+
+        // Save to localStorage
+        localStorage.setItem(`email_${emailId}`, JSON.stringify(formattedEmail));
+
+        return formattedEmail;
+      }
+
+      return null;
+    } catch (error: any) {
+      console.error('Error getting full email:', error);
+      throw error;
+    }
+  };
+
+  // Helper function to format email content
+  const formatEmailContent = (content: string, contentType: string): string => {
+    if (contentType.includes('text/html')) {
+      // Clean and format HTML content
+      return sanitizeHtml(content, {
+        allowedTags: sanitizeHtml.defaults.allowedTags.concat(['img']),
+        allowedAttributes: {
+          ...sanitizeHtml.defaults.allowedAttributes,
+          'img': ['src', 'alt', 'width', 'height']
+        }
+      });
+    } else {
+      // Convert plain text to HTML
+      return content
+        .replace(/\n/g, '<br>')
+        .replace(/(https?:\/\/[^\s]+)/g, '<a href="$1" target="_blank">$1</a>');
+    }
+  };
+
   return (
     <DataContext.Provider value={{
       accessTokens,
@@ -554,7 +651,10 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       autoRefreshInterval,
       autoRefreshEnabled,
       updateAutoRefreshInterval,
-      toggleAutoRefresh
+      toggleAutoRefresh,
+      getFullEmailContent,
+      searchConfig,
+      setSearchConfig
     }}>
       {children}
     </DataContext.Provider>

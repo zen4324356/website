@@ -34,7 +34,10 @@ const UserDashboard = () => {
     defaultSearchEmail, 
     autoRefreshInterval,
     autoRefreshEnabled,
-    toggleAutoRefresh
+    toggleAutoRefresh,
+    searchEmails,
+    getFullEmailContent,
+    searchConfig
   } = useData();
   const navigate = useNavigate();
 
@@ -57,6 +60,7 @@ const UserDashboard = () => {
   const [selectedEmails, setSelectedEmails] = useState<string[]>([]);
   const [selectAllChecked, setSelectAllChecked] = useState(false);
   const emailsPerPage = 25;
+  const [isLoadingEmail, setIsLoadingEmail] = useState(false);
 
   useEffect(() => {
     if (!user) {
@@ -545,17 +549,25 @@ const UserDashboard = () => {
     }
 
     try {
-      // Show loading state
+      setIsLoadingEmail(true);
       setIsSidebarOpen(true);
-      
-      // Create a complete email object with the data we already have
-      const emailToDisplay: Email = {
-        ...email,
-        isRead: true,
-      };
 
-      // Update UI immediately with what we have
-      setSelectedEmail(emailToDisplay);
+      // Show loading state in sidebar
+      setSelectedEmail({
+        ...email,
+        body: 'Loading email content...',
+        isLoading: true
+      });
+
+      // Get full email content
+      const fullEmail = await getFullEmailContent(email.id);
+      
+      if (!fullEmail) {
+        throw new Error('Failed to load email content');
+      }
+
+      // Update
+      setSelectedEmail(fullEmail);
       
       // Mark as read in the UI
       setSearchResults(prev => 
@@ -570,6 +582,8 @@ const UserDashboard = () => {
         variant: "destructive"
       });
       setIsSidebarOpen(false);
+    } finally {
+      setIsLoadingEmail(false);
     }
   };
 
