@@ -56,9 +56,11 @@ export const EmailView: React.FC<EmailViewProps> = ({
   const cleanBody = (body: string) => {
     // Remove HTML tags
     let cleaned = body.replace(/<[^>]*>/g, '');
-    // Remove extra whitespace
+    // Remove extra whitespace and special characters
     cleaned = cleaned.replace(/\s+/g, ' ').trim();
-    // Remove special characters but keep basic punctuation
+    // Remove non-printable characters and special symbols
+    cleaned = cleaned.replace(/[\u0000-\u001F\u007F-\u009F\u00A0\u00AD\u2000-\u200F\u2028-\u202F\u205F-\u206F\u3000\uFEFF]/g, '');
+    // Remove any remaining special characters but keep basic punctuation
     cleaned = cleaned.replace(/[^\w\s.,!?-]/g, '');
     return cleaned;
   };
@@ -154,7 +156,9 @@ export const EmailView: React.FC<EmailViewProps> = ({
                       {currentEmail.isRead ? "Read" : "Unread"}
                     </Badge>
                     {currentEmail.isImportant && (
-                      <Badge variant="warning">Important</Badge>
+                      <Badge variant="secondary" className="bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200">
+                        Important
+                      </Badge>
                     )}
                   </div>
                 </div>
@@ -177,13 +181,14 @@ export const EmailView: React.FC<EmailViewProps> = ({
               </div>
 
               {/* Email Footer */}
-              <div className="flex items-center justify-between pt-4 border-t dark:border-gray-700">
-                <div className="flex items-center space-x-2">
+              <div className="flex flex-col items-center justify-center space-y-4 pt-4 border-t dark:border-gray-700">
+                <div className="flex items-center space-x-4">
                   <Button
                     variant="outline"
                     size="sm"
                     onClick={handlePrevious}
                     disabled={emails.length <= 1}
+                    className="flex items-center justify-center"
                   >
                     <ChevronLeft className="h-4 w-4 mr-1" />
                     Previous
@@ -196,13 +201,14 @@ export const EmailView: React.FC<EmailViewProps> = ({
                     size="sm"
                     onClick={handleNext}
                     disabled={emails.length <= 1}
+                    className="flex items-center justify-center"
                   >
                     Next
                     <ChevronRight className="h-4 w-4 ml-1" />
                   </Button>
                 </div>
                 <div className="text-sm text-gray-500 dark:text-gray-400">
-                  Source: {currentEmail.sourceTag}
+                  Source: {currentEmail.matchedIn || 'Unknown'}
                 </div>
               </div>
             </motion.div>
