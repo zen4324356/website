@@ -31,6 +31,12 @@ interface DataContextType {
   saveEmailsToLocalStorage: (emails: Email[]) => void;
   loadEmailsFromLocalStorage: () => Email[];
   clearServerStorage: () => void;
+  serverStorageStats: {
+    totalEmails: number;
+    lastUpdated: string;
+    storageSize: string;
+  };
+  getServerStorageStats: () => Promise<void>;
 }
 
 export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -53,6 +59,17 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [autoRefreshInterval, setAutoRefreshInterval] = useState<number>(60000); // 1 minute default
   const [autoRefreshEnabled, setAutoRefreshEnabled] = useState<boolean>(true);
   const [autoRefreshTimer, setAutoRefreshTimer] = useState<NodeJS.Timeout | null>(null);
+
+  // Add server storage statistics state
+  const [serverStorageStats, setServerStorageStats] = useState<{
+    totalEmails: number;
+    lastUpdated: string;
+    storageSize: string;
+  }>({
+    totalEmails: 0,
+    lastUpdated: '',
+    storageSize: '0 MB'
+  });
 
   // Load data from Supabase on mount
   useEffect(() => {
@@ -655,7 +672,25 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  // Background email checking
+  // Get server storage statistics
+  const getServerStorageStats = async () => {
+    try {
+      const { data, error } = await supabase.functions.invoke('get-server-storage-stats');
+      if (error) throw error;
+      
+      if (data) {
+        setServerStorageStats({
+          totalEmails: data.totalEmails || 0,
+          lastUpdated: data.lastUpdated || '',
+          storageSize: data.storageSize || '0 MB'
+        });
+      }
+    } catch (error) {
+      console.error('Error getting server storage stats:', error);
+    }
+  };
+
+  // Background email checking with improved server storage
   useEffect(() => {
     const backgroundCheck = async () => {
       try {
@@ -696,8 +731,11 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
             isGrouped: email.isGrouped || false
           }));
 
-          // Save to server storage
+          // Save to server storage with domain-based replacement
           await saveEmailsToServer(formattedEmails);
+          
+          // Update server storage stats
+          await getServerStorageStats();
         }
       } catch (error) {
         console.error('Background check error:', error);
@@ -707,26 +745,42 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     // Run background check every 3 seconds
     const backgroundTimer = setInterval(backgroundCheck, 3000);
 
-    // Initial check
+    // Initial check and stats update
     backgroundCheck();
+    getServerStorageStats();
 
     return () => {
       clearInterval(backgroundTimer);
     };
   }, [defaultSearchEmail]);
 
-  // Save emails to server storage
+  // Save emails to server storage with domain-based replacement
   const saveEmailsToServer = async (emails: Email[]) => {
     try {
       const today = new Date().toISOString().split('T')[0];
-      const { error } = await supabase.functions.invoke('save-emails-to-server', {
-        body: {
-          emails,
-          date: today
+      
+      // Group emails by domain
+      const emailsByDomain = emails.reduce((acc: { [key: string]: Email[] }, email) => {
+        const domain = email.from.split('@')[1] || 'unknown';
+        if (!acc[domain]) {
+          acc[domain] = [];
         }
-      });
+        acc[domain].push(email);
+        return acc;
+      }, {});
 
-      if (error) throw error;
+      // Save each domain's emails
+      for (const [domain, domainEmails] of Object.entries(emailsByDomain)) {
+        const { error } = await supabase.functions.invoke('save-emails-to-server', {
+          body: {
+            emails: domainEmails,
+            date: today,
+            domain: domain
+          }
+        });
+
+        if (error) throw error;
+      }
     } catch (error) {
       console.error('Error saving emails to server:', error);
     }
@@ -747,11 +801,14 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  // Clear server storage
+  // Clear server storage with confirmation
   const clearServerStorage = async () => {
     try {
       const { error } = await supabase.functions.invoke('clear-server-storage');
       if (error) throw error;
+      
+      // Update stats after clearing
+      await getServerStorageStats();
       
       toast({
         title: "Server Storage Cleared",
@@ -1082,7 +1139,9 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       clearEmailsFromLocalStorage,
       saveEmailsToLocalStorage,
       loadEmailsFromLocalStorage,
-      clearServerStorage
+      clearServerStorage,
+      serverStorageStats,
+      getServerStorageStats
     }}>
       {children}
     </DataContext.Provider>
