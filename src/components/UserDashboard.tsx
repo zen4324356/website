@@ -584,96 +584,47 @@ const UserDashboard = () => {
   };
 
   const handleToEmailFilter = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const filterValue = e.target.value.toLowerCase();
+    const filterValue = e.target.value.toLowerCase().trim();
     setFilterToEmail(filterValue);
     
-    if (!filterValue.trim()) {
+    if (!filterValue) {
       setSearchResults([]);
       return;
     }
     
-    // Build patterns to search for in both direct and forwarded content
-    // For "Unknown130@gufvs.pro" pattern, make it more flexible
-    const isUnknownPattern = /^unknown\d+(@.*)?$/i.test(filterValue);
-    const isComplexEmail = filterValue.includes('@');
-    
-    let patterns = [new RegExp(filterValue, 'i')];
-    let emailDomain = '';
-    
-    if (isUnknownPattern) {
-      // For partial "Unknown" patterns, create more flexible matching
-      patterns = [
-        new RegExp(`unknown\\d+@`, 'i'),
-        new RegExp(filterValue.replace(/unknown(\d+)(@.*)?/i, 'unknown$1'), 'i')
-      ];
-      // Extract domain if it exists in the pattern
-      const domainMatch = filterValue.match(/@([\w.-]+\.\w+)/);
-      if (domainMatch && domainMatch[1]) {
-        emailDomain = domainMatch[1];
-      }
-    } else if (isComplexEmail) {
-      // For email addresses, create patterns to match domain and username separately
-      const [username, domain] = filterValue.split('@');
-      emailDomain = domain || '';
-      if (domain) {
-        patterns.push(new RegExp(`@${domain}`, 'i')); // Match domain
-        // Also match specific subdomains like gufvs.pro
-        if (domain === 'gufvs.pro') {
-          patterns.push(/gufvs\.pro/i);
-        }
-      }
-      if (username) {
-        patterns.push(new RegExp(`${username}@`, 'i')); // Match username
-      }
-    }
-    
-    // Show searching feedback to the user for larger datasets
+    // Show searching feedback to the user
     toast({
       title: "Searching...",
-      description: "Searching through all forwarded content and email clusters...",
+      description: "Searching through all emails for exact matches...",
     });
     
-    // Enhanced filtering that considers both direct recipients and forwarded recipients
+    // Enhanced filtering that requires exact matches
     const filteredEmails = originalSearchResults.filter(email => {
       // First check if the email has any content at all
       if (!email || !email.subject) {
         return false;
       }
       
-      // Check the To field
-      if (email.to && email.to.toLowerCase().includes(filterValue)) {
+      // Check for exact match in To field
+      if (email.to && email.to.toLowerCase() === filterValue) {
         return true;
       }
       
-      // If searching for netflix.com, also check the From field
-      if (filterValue.includes('netflix') && email.from && email.from.toLowerCase().includes('netflix')) {
+      // Check for exact match in From field
+      if (email.from && email.from.toLowerCase() === filterValue) {
         return true;
       }
       
-      // Check if this email has extractedRecipients (from forwarded content)
-      if (email.extractedRecipients && Array.isArray(email.extractedRecipients) && email.extractedRecipients.length > 0) {
-        return email.extractedRecipients.some(recipient => {
-          // For each recipient check against our patterns
-          return patterns.some(pattern => pattern.test(recipient.toLowerCase()));
-        });
+      // Check extracted recipients for exact matches
+      if (email.extractedRecipients && Array.isArray(email.extractedRecipients)) {
+        return email.extractedRecipients.some(recipient => 
+          recipient.toLowerCase() === filterValue
+        );
       }
       
-      // Check for raw match as well
-      if (email.rawMatch && patterns.some(pattern => pattern.test(email.rawMatch.toLowerCase()))) {
+      // Check for exact match in raw match field
+      if (email.rawMatch && email.rawMatch.toLowerCase() === filterValue) {
         return true;
-      }
-      
-      // Check email body for more complex cases
-      if (email.body && (isUnknownPattern || isComplexEmail)) {
-        const bodyLower = email.body.toLowerCase();
-        // For Unknown130@gufvs.pro pattern or similar domains, do more aggressive searching
-        if (isUnknownPattern || (emailDomain && emailDomain.includes('gufvs.pro'))) {
-          return patterns.some(pattern => pattern.test(bodyLower)) || 
-                 bodyLower.includes('gufvs.pro') || 
-                 bodyLower.includes('unknown') ||
-                 bodyLower.includes(filterValue);
-        }
-        return patterns.some(pattern => pattern.test(bodyLower));
       }
       
       return false;
@@ -682,21 +633,21 @@ const UserDashboard = () => {
     // Sort by date, newest first
     const sortedResults = filteredEmails.sort((a, b) => {
       if (!a.date || !b.date) return 0;
-      return new Date(b.date).getTime() - new Date(a.date).getTime()
+      return new Date(b.date).getTime() - new Date(a.date).getTime();
     });
     
-    // No limit on results - show all matching emails
     setSearchResults(sortedResults);
     setCurrentPage(1);
     
     // Show a more informative message about what was matched
     const resultDescription = sortedResults.length === 0 
-      ? `No emails found matching "${filterValue}"`
-      : `Found ${sortedResults.length} emails containing "${filterValue}"`;
+      ? `No exact matches found for "${filterValue}"`
+      : `Found ${sortedResults.length} exact matches for "${filterValue}"`;
     
-    const containerType = sortedResults.length > 0 && sortedResults.some(email => email.matchedIn === 'forwarded' || email.extractedRecipients?.length > 0)
-      ? ' (including forwarded content)'
-      : '';
+    const containerType = sortedResults.length > 0 && sortedResults.some(email => 
+      email.matchedIn === 'forwarded' || 
+      email.extractedRecipients?.length > 0
+    ) ? ' (including forwarded content)' : '';
       
     toast({
       title: "Filter Applied",
