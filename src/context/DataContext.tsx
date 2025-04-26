@@ -732,7 +732,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const { data, error } = await supabase.functions.invoke('get-email-content', {
         body: { 
           emailId,
-          format: 'raw' // Request raw format to get complete email
+          format: 'full' // Request full format to get complete email
         }
       });
 
@@ -740,13 +740,28 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (data.error) throw new Error(data.error);
 
       if (data.email) {
-        // Process and format the email
-        const processedEmail = await processRawEmail(data.email);
+        // Extract email content
+        const emailContent = extractEmailContent(data.email);
         
-        // Cache the processed email
-        localStorage.setItem(`email_${emailId}`, JSON.stringify(processedEmail));
+        // Create formatted email object
+        const formattedEmail = {
+          id: emailId,
+          threadId: data.email.threadId,
+          from: emailContent.from,
+          to: emailContent.to,
+          subject: emailContent.subject,
+          date: emailContent.date,
+          body: emailContent.body,
+          isRead: true,
+          isHidden: false,
+          hasFullContent: true,
+          attachments: emailContent.attachments || []
+        };
 
-        return processedEmail;
+        // Cache the formatted email
+        localStorage.setItem(`email_${emailId}`, JSON.stringify(formattedEmail));
+
+        return formattedEmail;
       }
 
       return null;
@@ -756,130 +771,88 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const processRawEmail = async (rawEmail: GmailEmail): Promise<Email> => {
-    try {
-      // Extract headers
-      const headers = rawEmail.payload?.headers || [];
-      const getHeader = (name: string) => 
-        headers.find(h => h.name.toLowerCase() === name.toLowerCase())?.value || '';
+  const extractEmailContent = (emailData: any) => {
+    const headers = emailData.payload.headers;
+    const getHeader = (name: string) => 
+      headers.find((h: any) => h.name.toLowerCase() === name.toLowerCase())?.value || '';
 
-      // Extract body content
-      let bodyContent = '';
+    let body = '';
+    
+    // Function to decode base64 content
+    const decodeContent = (encoded: string) => {
+      try {
+        return decodeURIComponent(
+          escape(
+            atob(
+              encoded.replace(/-/g, '+').replace(/_/g, '/')
+            )
+          )
+        );
+      } catch (e) {
+        console.error('Error decoding content:', e);
+        return encoded;
+      }
+    };
+
+    // Function to extract content from parts
+    const extractFromParts = (parts: any[]) => {
       let htmlContent = '';
       let plainContent = '';
 
-      const processMessagePart = (part: any) => {
-        if (!part) return;
-
-        if (part.body?.data) {
-          const content = decodeBase64UrlSafe(part.body.data);
-          if (part.mimeType === 'text/html') {
-            htmlContent = content;
-          } else if (part.mimeType === 'text/plain') {
-            plainContent = content;
-          }
+      parts.forEach((part: any) => {
+        if (part.mimeType === 'text/html' && part.body?.data) {
+          htmlContent = decodeContent(part.body.data);
+        } else if (part.mimeType === 'text/plain' && part.body?.data) {
+          plainContent = decodeContent(part.body.data);
         }
-
         if (part.parts) {
-          part.parts.forEach(processMessagePart);
+          const nestedContent = extractFromParts(part.parts);
+          htmlContent = htmlContent || nestedContent.html;
+          plainContent = plainContent || nestedContent.plain;
         }
-      };
+      });
 
-      processMessagePart(rawEmail.payload);
+      return { html: htmlContent, plain: plainContent };
+    };
 
-      // Prefer HTML content, fallback to plain text
-      if (htmlContent) {
-        bodyContent = await cleanHtmlContent(htmlContent);
-      } else if (plainContent) {
-        bodyContent = plainContent;
-      }
-
-      return {
-        id: rawEmail.id,
-        threadId: rawEmail.threadId,
-        from: getHeader('From'),
-        to: getHeader('To'),
-        subject: getHeader('Subject'),
-        date: getHeader('Date'),
-        body: bodyContent,
-        isRead: true,
-        isHidden: false,
-        hasFullContent: true
-      };
-    } catch (error) {
-      console.error('Error processing raw email:', error);
-      throw error;
+    // Extract body content
+    if (emailData.payload.parts) {
+      const content = extractFromParts(emailData.payload.parts);
+      body = content.html || content.plain;
+    } else if (emailData.payload.body?.data) {
+      body = decodeContent(emailData.payload.body.data);
     }
-  };
 
-  const cleanHtmlContent = async (html: string): Promise<string> => {
-    try {
-      // Create a DOMParser to parse HTML
-      const parser = new DOMParser();
-      const doc = parser.parseFromString(html, 'text/html');
-
-      // Remove script tags
-      doc.querySelectorAll('script').forEach(el => el.remove());
-      doc.querySelectorAll('style').forEach(el => el.remove());
-
-      // Process all elements to clean them
-      const processNode = (node: Element) => {
-        // Remove all style attributes
-        node.removeAttribute('style');
-        
-        // Remove all event handlers
-        const attrs = node.attributes;
-        for (let i = attrs.length - 1; i >= 0; i--) {
-          const attr = attrs[i];
-          if (attr.name.startsWith('on')) {
-            node.removeAttribute(attr.name);
-          }
+    // Extract attachments
+    const attachments = [];
+    const processPartsForAttachments = (parts: any[]) => {
+      parts.forEach((part: any) => {
+        if (part.filename && part.body?.attachmentId) {
+          attachments.push({
+            id: part.body.attachmentId,
+            filename: part.filename,
+            mimeType: part.mimeType,
+            size: part.body.size
+          });
         }
+        if (part.parts) {
+          processPartsForAttachments(part.parts);
+        }
+      });
+    };
 
-        // Process child elements
-        node.querySelectorAll('*').forEach(processNode);
-      };
-
-      processNode(doc.body);
-
-      // Extract text content while preserving basic formatting
-      const cleanContent = doc.body.innerHTML
-        .replace(/<div[^>]*>/gi, '\n')
-        .replace(/<\/div>/gi, '')
-        .replace(/<p[^>]*>/gi, '\n')
-        .replace(/<\/p>/gi, '\n')
-        .replace(/<br[^>]*>/gi, '\n')
-        .replace(/<[^>]+>/g, '') // Remove remaining HTML tags
-        .replace(/&nbsp;/g, ' ')
-        .replace(/\n\s*\n/g, '\n\n') // Remove extra blank lines
-        .trim();
-
-      return cleanContent;
-    } catch (error) {
-      console.error('Error cleaning HTML content:', error);
-      return html; // Return original content if cleaning fails
+    if (emailData.payload.parts) {
+      processPartsForAttachments(emailData.payload.parts);
     }
-  };
 
-  const decodeBase64UrlSafe = (encoded: string): string => {
-    try {
-      // Replace URL-safe characters
-      const base64 = encoded
-        .replace(/-/g, '+')
-        .replace(/_/g, '/');
-
-      // Add padding if needed
-      const pad = base64.length % 4;
-      const padded = pad 
-        ? base64 + '='.repeat(4 - pad)
-        : base64;
-
-      // Decode
-      return decodeURIComponent(escape(atob(padded)));
-    } catch (error) {
-      console.error('Error decoding base64:', error);
-      return '';
-    }
+    return {
+      from: getHeader('From'),
+      to: getHeader('To'),
+      subject: getHeader('Subject'),
+      date: getHeader('Date'),
+      body: body,
+      attachments
+    };
   };
 
   return (
