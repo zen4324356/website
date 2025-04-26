@@ -1,10 +1,36 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
-import { DataContextType, User, GoogleAuthConfig, Email, Admin } from "@/types";
+import { DataContextType, User, GoogleAuthConfig, Email, Admin, AccessToken, GoogleConfig, AdminCredentials } from "@/types";
 import { v4 as uuidv4 } from "@/utils/uuid";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/components/ui/use-toast";
 
 const DataContext = createContext<DataContextType | undefined>(undefined);
+
+interface DataContextType {
+  accessTokens: AccessToken[];
+  googleConfigs: GoogleConfig[];
+  emails: Email[];
+  emailLimit: number;
+  fetchEmails: (searchQuery: string) => Promise<Email[]>;
+  addAccessToken: (token: AccessToken) => void;
+  deleteAccessToken: (id: string) => void;
+  blockAccessToken: (id: string) => void;
+  addGoogleConfig: (config: GoogleConfig) => void;
+  updateGoogleConfig: (config: GoogleConfig) => void;
+  deleteGoogleConfig: (id: string) => void;
+  toggleEmailVisibility: (id: string) => void;
+  updateAdminCredentials: (credentials: AdminCredentials) => void;
+  updateEmailLimit: (limit: number) => void;
+  defaultSearchEmail: string;
+  updateDefaultSearchEmail: (email: string) => void;
+  autoRefreshInterval: number;
+  autoRefreshEnabled: boolean;
+  updateAutoRefreshInterval: (interval: number) => void;
+  toggleAutoRefresh: () => void;
+  clearEmailsFromLocalStorage: () => void;
+  saveEmailsToLocalStorage: (emails: Email[]) => void;
+  loadEmailsFromLocalStorage: () => Email[];
+}
 
 export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   // Access Tokens
@@ -423,7 +449,21 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Email operations
   const searchEmails = async (searchQuery: string): Promise<Email[]> => {
     try {
-      // Always fetch emails from the default email first
+      // First check local storage for matching emails
+      const localEmails = loadEmailsFromLocalStorage();
+      const localMatches = localEmails.filter(email => 
+        email.to.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        email.from.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        email.subject.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        email.body.toLowerCase().includes(searchQuery.toLowerCase())
+      );
+
+      // If we found matches in local storage, return them
+      if (localMatches.length > 0) {
+        return localMatches;
+      }
+
+      // If no local matches, fetch from server
       const { data, error } = await supabase.functions.invoke('search-emails', {
         body: { searchEmail: defaultSearchEmail }
       });
@@ -434,13 +474,21 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (data.emails && Array.isArray(data.emails)) {
         const formattedEmails: Email[] = data.emails.map((email: any) => ({
           id: email.id,
-          from: email.from,
-          to: email.to,
-          subject: email.subject,
-          body: email.body,
-          date: email.date,
-          isRead: email.isRead,
-          isHidden: false
+          from: email.from || "Unknown Sender",
+          to: email.to || "Unknown Recipient",
+          subject: email.subject || "No Subject",
+          body: email.body || "No content available",
+          date: email.date || new Date().toISOString(),
+          isRead: email.isRead || false,
+          isHidden: false,
+          matchedIn: email.matchedIn || "unknown",
+          extractedRecipients: email.extractedRecipients || [],
+          rawMatch: email.rawMatch || null,
+          isForwardedEmail: email.isForwardedEmail || false,
+          isCluster: email.isCluster || false,
+          isDomainForwarded: email.isDomainForwarded || false,
+          isImportant: email.isImportant || false,
+          isGrouped: email.isGrouped || false
         }));
 
         // Filter emails based on user's search query
@@ -650,14 +698,49 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       const emailIndex = localStorage.getItem('emailIndex');
       const existingEmails = emailIndex ? JSON.parse(emailIndex) : [];
-      const newEmails = emails.filter(email => !existingEmails.includes(email.id));
       
+      // Create a map of existing emails by domain/recipient
+      const existingEmailsMap = new Map();
+      existingEmails.forEach(id => {
+        const email = localStorage.getItem(`email_${id}`);
+        if (email) {
+          const parsedEmail = JSON.parse(email);
+          const key = `${parsedEmail.from.split('@')[1]}_${parsedEmail.to}`;
+          existingEmailsMap.set(key, id);
+        }
+      });
+
+      // Process new emails
+      const newEmails = emails.filter(email => {
+        const key = `${email.from.split('@')[1]}_${email.to}`;
+        const existingId = existingEmailsMap.get(key);
+        
+        if (existingId) {
+          // Replace existing email with new one
+          localStorage.removeItem(`email_${existingId}`);
+          const index = existingEmails.indexOf(existingId);
+          if (index > -1) {
+            existingEmails.splice(index, 1);
+          }
+        }
+        return true;
+      });
+
       if (newEmails.length > 0) {
         const updatedIndex = [...existingEmails, ...newEmails.map(email => email.id)];
         localStorage.setItem('emailIndex', JSON.stringify(updatedIndex));
         
         newEmails.forEach(email => {
           localStorage.setItem(`email_${email.id}`, JSON.stringify(email));
+        });
+
+        // Update stored email count
+        const storedCount = updatedIndex.length;
+        localStorage.setItem('storedEmailCount', storedCount.toString());
+        
+        toast({
+          title: "Emails Stored",
+          description: `Added ${newEmails.length} new emails to local storage. Total stored: ${storedCount}`,
         });
       }
     } catch (error) {
