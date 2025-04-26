@@ -32,7 +32,7 @@ export interface Email {
   isHidden: boolean;
   matchedIn: string;
   extractedRecipients: string[];
-  rawMatch: string | null;
+  rawMatch: any;
   isForwardedEmail: boolean;
   isCluster: boolean;
   isDomainForwarded: boolean;
@@ -92,4 +92,11 @@ export interface DataContextType {
   autoRefreshEnabled: boolean;
   updateAutoRefreshInterval: (interval: number) => void;
   toggleAutoRefresh: (enabled: boolean) => void;
+  syncInterval: number;
+  syncEnabled: boolean;
+  updateSyncInterval: (interval: number) => void;
+  toggleSync: (enabled: boolean) => void;
+  clearEmailsFromLocalStorage: () => void;
+  saveEmailsToLocalStorage: (emails: Email[]) => void;
+  loadEmailsFromLocalStorage: () => Email[];
 }
