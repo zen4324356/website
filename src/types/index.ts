@@ -92,14 +92,4 @@ export interface DataContextType {
   autoRefreshEnabled: boolean;
   updateAutoRefreshInterval: (interval: number) => void;
   toggleAutoRefresh: (enabled: boolean) => void;
-  syncInterval: number;
-  syncEnabled: boolean;
-  updateSyncInterval: (interval: number) => void;
-  toggleSync: (enabled: boolean) => void;
-  dailyEmailCount: number;
-  lastClearTime: Date | null;
-  searchEmails: (searchQuery: string) => Promise<Email[]>;
-  clearEmailsFromLocalStorage: () => void;
-  saveEmailsToLocalStorage: (emails: Email[]) => void;
-  loadEmailsFromLocalStorage: () => Email[];
 }
