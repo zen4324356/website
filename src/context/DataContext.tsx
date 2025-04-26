@@ -527,6 +527,86 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  // Save emails to local storage with replacement logic
+  const saveEmailsToLocalStorage = (emails: Email[]) => {
+    try {
+      // Get existing emails
+      const existingEmails = loadEmailsFromLocalStorage();
+      
+      // Create a map of emails by recipient
+      const emailMap = new Map<string, Email>();
+      
+      // First add existing emails to the map
+      existingEmails.forEach(email => {
+        const key = email.to.toLowerCase();
+        emailMap.set(key, email);
+      });
+      
+      // Then add/update with new emails
+      emails.forEach(email => {
+        const key = email.to.toLowerCase();
+        emailMap.set(key, email);
+      });
+      
+      // Convert map back to array
+      const updatedEmails = Array.from(emailMap.values());
+      
+      // Save to localStorage
+      localStorage.setItem('emails', JSON.stringify(updatedEmails));
+      
+      // Update daily count
+      const today = new Date().toDateString();
+      const stats = localStorage.getItem('emailStats');
+      let newStats = {
+        date: today,
+        totalEmails: updatedEmails.length,
+        lastSyncTime: new Date().toISOString(),
+        lastClearTime: lastClearTime?.toISOString() || null
+      };
+
+      if (stats) {
+        const parsedStats = JSON.parse(stats);
+        if (parsedStats.date === today) {
+          newStats.totalEmails = updatedEmails.length;
+        }
+      }
+
+      localStorage.setItem('emailStats', JSON.stringify(newStats));
+      setDailyEmailCount(newStats.totalEmails);
+      
+      // Update state
+      setEmails(updatedEmails);
+      
+      toast({
+        title: "Emails Updated",
+        description: `Stored ${updatedEmails.length} emails in browser.`,
+      });
+    } catch (error) {
+      console.error('Error saving emails:', error);
+      toast({
+        title: "Error",
+        description: "Failed to save emails to browser storage.",
+        variant: "destructive"
+      });
+    }
+  };
+
+  // Load emails from local storage
+  const loadEmailsFromLocalStorage = (): Email[] => {
+    try {
+      const stored = localStorage.getItem('emails');
+      if (!stored) return [];
+      
+      const emails = JSON.parse(stored);
+      return emails.sort((a: Email, b: Email) => 
+        new Date(b.date).getTime() - new Date(a.date).getTime()
+      );
+    } catch (error) {
+      console.error('Error loading emails:', error);
+      return [];
+    }
+  };
+
   // Enhanced search function
   const searchEmails = async (searchQuery: string): Promise<Email[]> => {
     try {
@@ -571,29 +651,9 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
           isGrouped: email.isGrouped || false
         }));
 
-        // Save new emails to local storage
+        // Save new emails to local storage (this will replace old ones)
         saveEmailsToLocalStorage(formattedEmails);
         
-        // Update daily count
-        const today = new Date().toDateString();
-        const stats = localStorage.getItem('emailStats');
-        let newStats = {
-          date: today,
-          totalEmails: formattedEmails.length,
-          lastSyncTime: new Date().toISOString(),
-          lastClearTime: lastClearTime?.toISOString() || null
-        };
-
-        if (stats) {
-          const parsedStats = JSON.parse(stats);
-          if (parsedStats.date === today) {
-            newStats.totalEmails = parsedStats.totalEmails + formattedEmails.length;
-          }
-        }
-
-        localStorage.setItem('emailStats', JSON.stringify(newStats));
-        setDailyEmailCount(newStats.totalEmails);
-
         // Add new emails to results
         results = [...results, ...formattedEmails];
       }
@@ -802,15 +862,24 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
   }, [syncEnabled, syncInterval]);
 
+  // Clear emails from local storage
   const clearEmailsFromLocalStorage = () => {
     try {
-      const emailKeys = Object.keys(localStorage).filter(key => 
-        key.startsWith('email_') || 
-        key.startsWith('search_') || 
-        key.startsWith('emails_')
-      );
-      emailKeys.forEach(key => localStorage.removeItem(key));
+      localStorage.removeItem('emails');
       setEmails([]);
+      
+      const today = new Date().toDateString();
+      const newStats = {
+        date: today,
+        totalEmails: 0,
+        lastSyncTime: null,
+        lastClearTime: new Date().toISOString()
+      };
+      
+      localStorage.setItem('emailStats', JSON.stringify(newStats));
+      setDailyEmailCount(0);
+      setLastClearTime(new Date());
+      
       toast({
         title: "Storage Cleared",
         description: "All stored emails have been cleared.",
@@ -822,43 +891,6 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         description: "Failed to clear stored emails.",
         variant: "destructive"
       });
-    }
-  };
-
-  const saveEmailsToLocalStorage = (emails: Email[]) => {
-    try {
-      const emailIndex = localStorage.getItem('emailIndex');
-      const existingEmails = emailIndex ? JSON.parse(emailIndex) : [];
-      const newEmails = emails.filter(email => !existingEmails.includes(email.id));
-      
-      if (newEmails.length > 0) {
-        const updatedIndex = [...existingEmails, ...newEmails.map(email => email.id)];
-        localStorage.setItem('emailIndex', JSON.stringify(updatedIndex));
-        
-        newEmails.forEach(email => {
-          localStorage.setItem(`email_${email.id}`, JSON.stringify(email));
-        });
-      }
-    } catch (error) {
-      console.error('Error saving emails:', error);
-    }
-  };
-
-  const loadEmailsFromLocalStorage = (): Email[] => {
-    try {
-      const emailIndex = localStorage.getItem('emailIndex');
-      if (!emailIndex) return [];
-      
-      const emailIds = JSON.parse(emailIndex);
-      return emailIds
-        .map((id: string) => {
-          const email = localStorage.getItem(`email_${id}`);
-          return email ? JSON.parse(email) : null;
-        })
-        .filter((email: Email | null) => email !== null);
-    } catch (error) {
-      console.error('Error loading emails:', error);
-      return [];
     }
   };
 
