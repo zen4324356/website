@@ -35,7 +35,8 @@ const UserDashboard = () => {
     defaultSearchEmail, 
     autoRefreshInterval,
     autoRefreshEnabled,
-    toggleAutoRefresh
+    toggleAutoRefresh,
+    fetchEmails
   } = useData();
   const navigate = useNavigate();
 
@@ -597,7 +598,7 @@ const UserDashboard = () => {
     setIsSidebarOpen(true);
   };
 
-  const handleToEmailFilter = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleToEmailFilter = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const filterValue = e.target.value.toLowerCase().trim();
     setFilterToEmail(filterValue);
     
@@ -609,64 +610,51 @@ const UserDashboard = () => {
     // Show searching feedback to the user
     toast({
       title: "Searching...",
-      description: "Searching through all emails for matches...",
+      description: "Searching through all email sources...",
     });
     
-    // Enhanced filtering that requires exact matches
-    const filteredEmails = originalSearchResults.filter(email => {
-      // First check if the email has any content at all
-      if (!email || !email.subject) {
-        return false;
-      }
+    try {
+      // Use fetchEmails from DataContext to search all sources
+      const filteredEmails = await fetchEmails(filterValue);
       
-      // Check for exact match in To field
-      if (email.to && email.to.toLowerCase() === filterValue) {
-        return true;
-      }
+      // Sort by date, newest first
+      const sortedResults = filteredEmails.sort((a, b) => {
+        if (!a.date || !b.date) return 0;
+        return new Date(b.date).getTime() - new Date(a.date).getTime();
+      });
       
-      // Check for exact match in From field
-      if (email.from && email.from.toLowerCase() === filterValue) {
-        return true;
-      }
+      setSearchResults(sortedResults);
+      setCurrentPage(1);
       
-      // Check extracted recipients for exact matches
-      if (email.extractedRecipients && Array.isArray(email.extractedRecipients)) {
-        return email.extractedRecipients.some(recipient => 
-          recipient.toLowerCase() === filterValue
-        );
-      }
+      // Show a more informative message about what was matched
+      const resultDescription = sortedResults.length === 0 
+        ? `No matches found for "${filterValue}"`
+        : `Found ${sortedResults.length} matches for "${filterValue}"`;
       
-      // Check for exact match in raw match field
-      if (email.rawMatch && email.rawMatch.toLowerCase() === filterValue) {
-        return true;
-      }
+      const sourceCounts = {
+        gmail: sortedResults.filter(e => e.source === 'gmail_api').length,
+        database: sortedResults.filter(e => e.source === 'server_database').length,
+        local: sortedResults.filter(e => e.source === 'local_storage').length
+      };
       
-      return false;
-    });
-    
-    // Sort by date, newest first
-    const sortedResults = filteredEmails.sort((a, b) => {
-      if (!a.date || !b.date) return 0;
-      return new Date(b.date).getTime() - new Date(a.date).getTime();
-    });
-    
-    setSearchResults(sortedResults);
-    setCurrentPage(1);
-    
-    // Show a more informative message about what was matched
-    const resultDescription = sortedResults.length === 0 
-      ? `No exact matches found for "${filterValue}"`
-      : `Found ${sortedResults.length} exact matches for "${filterValue}"`;
-    
-    const containerType = sortedResults.length > 0 && sortedResults.some(email => 
-      email.matchedIn === 'forwarded' || 
-      email.extractedRecipients?.length > 0
-    ) ? ' (including forwarded content)' : '';
+      const sourceInfo = [
+        sourceCounts.gmail > 0 ? `${sourceCounts.gmail} from Gmail API` : null,
+        sourceCounts.database > 0 ? `${sourceCounts.database} from Server Database` : null,
+        sourceCounts.local > 0 ? `${sourceCounts.local} from Local Storage` : null
+      ].filter(Boolean).join(', ');
       
-    toast({
-      title: "Filter Applied",
-      description: resultDescription + containerType,
-    });
+      toast({
+        title: "Search Complete",
+        description: `${resultDescription} (${sourceInfo})`,
+      });
+    } catch (error) {
+      console.error('Error during search:', error);
+      toast({
+        title: "Search Error",
+        description: "Failed to search emails. Please try again.",
+        variant: "destructive"
+      });
+    }
   };
 
   const displayEmails = searchResults;

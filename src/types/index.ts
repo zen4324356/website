@@ -58,26 +58,36 @@ export interface AuthContextType {
 }
 
 export interface DataContextType {
-  accessTokens: User[];
+  accessTokens: AccessToken[];
   googleConfigs: GoogleAuthConfig[];
   emails: Email[];
   emailLimit: number;
-  fetchEmails: (emailId: string) => Promise<Email[]>;
-  addAccessToken: (token: string) => void;
+  fetchEmails: (searchQuery: string) => Promise<Email[]>;
+  addAccessToken: (token: AccessToken) => void;
   deleteAccessToken: (id: string) => void;
-  blockAccessToken: (id: string, blocked: boolean) => void;
+  blockAccessToken: (id: string) => void;
   addGoogleConfig: (config: Omit<GoogleAuthConfig, "id" | "isActive">) => void;
   updateGoogleConfig: (id: string, config: Partial<GoogleAuthConfig>) => void;
   deleteGoogleConfig: (id: string) => void;
   toggleEmailVisibility: (id: string) => void;
-  updateAdminCredentials: (username: string, password: string) => Promise<void>;
+  updateAdminCredentials: (credentials: AdminCredentials) => void;
   updateEmailLimit: (limit: number) => void;
   defaultSearchEmail: string;
-  updateDefaultSearchEmail: (email: string) => Promise<void>;
+  updateDefaultSearchEmail: (email: string) => void;
   autoRefreshInterval: number;
   autoRefreshEnabled: boolean;
   updateAutoRefreshInterval: (interval: number) => void;
-  toggleAutoRefresh: (enabled: boolean) => void;
+  toggleAutoRefresh: () => void;
+  clearEmailsFromLocalStorage: () => void;
+  saveEmailsToLocalStorage: (emails: Email[]) => void;
+  loadEmailsFromLocalStorage: () => Email[];
+  clearServerStorage: () => void;
+  serverStorageStats: {
+    totalEmails: number;
+    lastUpdated: string;
+    storageSize: string;
+  };
+  getServerStorageStats: () => Promise<void>;
 }
 
 export interface AdminSettings {
