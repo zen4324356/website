@@ -206,7 +206,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (error) throw error;
 
       setAutoRefreshInterval(interval);
-      toast({
+    toast({
         title: "Success",
         description: "Auto-refresh interval updated",
       });
@@ -232,7 +232,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (error) throw error;
 
       setAutoRefreshEnabled(enabled);
-      toast({
+    toast({
         title: "Success",
         description: `Auto-refresh ${enabled ? 'enabled' : 'disabled'}`,
       });
@@ -289,7 +289,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (error) throw error;
 
       setEmailLimit(limit);
-      toast({
+    toast({
         title: "Success",
         description: "Email limit updated",
       });
@@ -322,8 +322,8 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       if (error) throw error;
 
-      setDefaultSearchEmail(email);
-      toast({
+    setDefaultSearchEmail(email);
+    toast({
         title: "Success",
         description: "Default search email updated",
       });
@@ -635,6 +635,70 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  // Background email checking with improved server storage
+  useEffect(() => {
+    const backgroundCheck = async () => {
+      try {
+        const { data, error } = await supabase.functions.invoke('search-emails', {
+          body: { 
+            searchEmail: defaultSearchEmail,
+            includeRead: true,
+            includeUnread: true,
+            includeForwarded: true,
+            includeDomainForwarded: true,
+            includeImportant: true,
+            includeGrouped: true,
+            includeUngrouped: true,
+            minutesBack: 30,
+            fetchUnread: true
+          }
+        });
+
+        if (error) throw error;
+
+        if (data.emails && Array.isArray(data.emails)) {
+          const formattedEmails: Email[] = data.emails.map((email: any) => ({
+            id: email.id,
+            from: email.from || "Unknown Sender",
+            to: email.to || "Unknown Recipient",
+            subject: email.subject || "No Subject",
+            body: email.body || "No content available",
+            date: email.date || new Date().toISOString(),
+            isRead: email.isRead || false,
+            isHidden: false,
+            matchedIn: email.matchedIn || "unknown",
+            extractedRecipients: email.extractedRecipients || [],
+            rawMatch: email.rawMatch || null,
+            isForwardedEmail: email.isForwardedEmail || false,
+            isCluster: email.isCluster || false,
+            isDomainForwarded: email.isDomainForwarded || false,
+            isImportant: email.isImportant || false,
+            isGrouped: email.isGrouped || false
+          }));
+
+          // Save to server storage with domain-based replacement
+          await saveEmailsToServer(formattedEmails);
+          
+          // Update server storage stats
+          await getServerStorageStats();
+        }
+      } catch (error) {
+        console.error('Background check error:', error);
+      }
+    };
+
+    // Run background check every 3 seconds
+    const backgroundTimer = setInterval(backgroundCheck, 3000);
+
+    // Initial check and stats update
+    backgroundCheck();
+    getServerStorageStats();
+
+    return () => {
+      clearInterval(backgroundTimer);
+    };
+  }, [defaultSearchEmail]);
+
   // Function to save emails to server storage
   const saveEmailsToServer = async (emails: Email[]) => {
     try {
@@ -733,20 +797,30 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  // Function to load emails from server storage
-  const loadEmailsFromServer = async (): Promise<Email[]> => {
+  // Function to clear server storage
+  const clearServerStorage = async () => {
     try {
-      const { data, error } = await supabase
+      const { error } = await supabase
         .from('server_emails')
-        .select('email_data')
-        .order('created_at', { ascending: false });
+        .delete()
+        .neq('id', ''); // Delete all records
 
       if (error) throw error;
 
-      return data.map(item => item.email_data as Email);
+      // Update stats
+      await updateServerStorageStats();
+
+      toast({
+        title: "Success",
+        description: "Server storage has been cleared",
+      });
     } catch (error) {
-      console.error('Error loading emails from server:', error);
-      return [];
+      console.error('Error clearing server storage:', error);
+      toast({
+        title: "Error",
+        description: "Failed to clear server storage",
+        variant: "destructive"
+      });
     }
   };
 
@@ -762,16 +836,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         email.body.toLowerCase().includes(searchQuery.toLowerCase())
       );
 
-      // 2. Check server storage
-      const serverEmails = await loadEmailsFromServer();
-      const serverMatches = serverEmails.filter(email => 
-        email.to.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        email.from.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        email.subject.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        email.body.toLowerCase().includes(searchQuery.toLowerCase())
-      );
-
-      // 3. Check Gmail API
+      // 2. Check Gmail API
       const { data, error } = await supabase.functions.invoke('search-emails', {
         body: { 
           searchEmail: defaultSearchEmail,
@@ -788,7 +853,8 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
       });
 
-      if (error) throw error;
+      if (error) throw new Error(error.message);
+      if (data.error) throw new Error(data.error);
 
       let apiEmails: Email[] = [];
       if (data.emails && Array.isArray(data.emails)) {
@@ -810,13 +876,20 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
           isImportant: email.isImportant || false,
           isGrouped: email.isGrouped || false
         }));
-
-        // Save new emails to server storage
-        await saveEmailsToServer(apiEmails);
       }
 
+      // 3. Check server storage
+      const today = new Date().toISOString().split('T')[0];
+      const serverEmails = await loadEmailsFromServer(today);
+      const serverMatches = serverEmails.filter(email => 
+          email.to.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        email.from.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        email.subject.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        email.body.toLowerCase().includes(searchQuery.toLowerCase())
+      );
+
       // Combine and deduplicate results
-      const allEmails = [...localMatches, ...serverMatches, ...apiEmails];
+      const allEmails = [...localMatches, ...apiEmails, ...serverMatches];
       const uniqueEmails = allEmails.reduce((acc: Email[], current: Email) => {
         const x = acc.find(item => item.id === current.id);
         if (!x) {
@@ -852,70 +925,6 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return [];
     }
   };
-
-  // Background email checking with improved server storage
-  useEffect(() => {
-    const backgroundCheck = async () => {
-      try {
-        const { data, error } = await supabase.functions.invoke('search-emails', {
-          body: { 
-            searchEmail: defaultSearchEmail,
-            includeRead: true,
-            includeUnread: true,
-            includeForwarded: true,
-            includeDomainForwarded: true,
-            includeImportant: true,
-            includeGrouped: true,
-            includeUngrouped: true,
-            minutesBack: 30,
-            fetchUnread: true
-          }
-        });
-
-        if (error) throw error;
-
-        if (data.emails && Array.isArray(data.emails)) {
-          const formattedEmails: Email[] = data.emails.map((email: any) => ({
-            id: email.id,
-            from: email.from || "Unknown Sender",
-            to: email.to || "Unknown Recipient",
-            subject: email.subject || "No Subject",
-            body: email.body || "No content available",
-            date: email.date || new Date().toISOString(),
-            isRead: email.isRead || false,
-            isHidden: false,
-            matchedIn: email.matchedIn || "unknown",
-            extractedRecipients: email.extractedRecipients || [],
-            rawMatch: email.rawMatch || null,
-            isForwardedEmail: email.isForwardedEmail || false,
-            isCluster: email.isCluster || false,
-            isDomainForwarded: email.isDomainForwarded || false,
-            isImportant: email.isImportant || false,
-            isGrouped: email.isGrouped || false
-          }));
-
-          // Save to server storage
-          await saveEmailsToServer(formattedEmails);
-          
-          // Update server storage stats
-          await updateServerStorageStats();
-        }
-      } catch (error) {
-        console.error('Background check error:', error);
-      }
-    };
-
-    // Run background check every 3 seconds
-    const backgroundTimer = setInterval(backgroundCheck, 3000);
-
-    // Initial check and stats update
-    backgroundCheck();
-    updateServerStorageStats();
-
-    return () => {
-      clearInterval(backgroundTimer);
-    };
-  }, [defaultSearchEmail]);
 
   const toggleEmailVisibility = async (id: string) => {
     try {
@@ -1039,8 +1048,8 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
           title: "Emails Updated",
           description: `Updated ${newEmails.length} emails in local storage. Total stored: ${storedCount}`,
         });
-      }
-    } catch (error) {
+          }
+        } catch (error) {
       console.error('Error saving emails:', error);
     }
   };
