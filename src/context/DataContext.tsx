@@ -572,44 +572,129 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Helper function to format email content without sanitize-html
   const formatEmailContent = (content: string, contentType: string): string => {
     if (contentType.includes('text/html')) {
-      // Basic HTML sanitization
-      const sanitized = content
-        // Remove potentially dangerous tags
+      // First preserve all "Get Code" buttons and important links
+      let sanitized = content
+        // Preserve Get Code buttons with specific styling
+        .replace(
+          /<a\s+[^>]*?class=["']button["'][^>]*>.*?Get\s+Code.*?<\/a>/gi,
+          (match) => `<div class="get-code-button">${match}</div>`
+        )
+        // Preserve other important buttons
+        .replace(
+          /<button[^>]*>(.*?Get\s+Code.*?)<\/button>/gi,
+          '<button class="get-code-button" style="display: inline-block !important; visibility: visible !important; opacity: 1 !important; background-color: #e50914; color: white; padding: 12px 24px; border-radius: 4px; font-weight: bold; margin: 10px 0; cursor: pointer; border: none; text-decoration: none;">$1</button>'
+        )
+        // Ensure Get Code links are visible
+        .replace(
+          /<a\s+(?:[^>]*?\s+)?href=(["'])(.*?(?:get|code).*?)\1/gi,
+          '<a href=$1$2$1 class="get-code-link" style="display: inline-block !important; visibility: visible !important; opacity: 1 !important; background-color: #e50914; color: white; padding: 8px 16px; border-radius: 4px; font-weight: bold; margin: 5px 0; text-decoration: none;"'
+        );
+
+      // Basic security sanitization
+      sanitized = sanitized
         .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
         .replace(/<iframe\b[^<]*(?:(?!<\/iframe>)<[^<]*)*<\/iframe>/gi, '')
         .replace(/<link\b[^<]*(?:(?!<\/link>)<[^<]*)*<\/link>/gi, '')
-        // Remove on* event handlers
         .replace(/ on\w+="[^"]*"/g, '')
         .replace(/ on\w+='[^']*'/g, '')
-        // Remove javascript: URLs
-        .replace(/javascript:[^\s"']+/gi, '')
-        // Add target="_blank" to links
-        .replace(/<a\s+(?:[^>]*?\s+)?href=/gi, '<a target="_blank" rel="noopener noreferrer" href=');
+        .replace(/javascript:[^\s"']+/gi, '');
 
-      // Wrap in container with styles
-      return `
-        <div class="email-content" style="
-          font-family: Arial, sans-serif;
-          line-height: 1.6;
-          color: #FFFFFF;
-          max-width: 100%;
-          overflow-wrap: break-word;
-        ">
+      // Add styles for buttons and links
+      const styledContent = `
+        <style>
+          .email-content {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            color: #FFFFFF;
+            max-width: 100%;
+            overflow-wrap: break-word;
+          }
+          
+          .get-code-button a,
+          .get-code-link {
+            display: inline-block !important;
+            visibility: visible !important;
+            opacity: 1 !important;
+            background-color: #e50914;
+            color: white !important;
+            padding: 12px 24px;
+            border-radius: 4px;
+            font-weight: bold;
+            margin: 10px 0;
+            text-decoration: none;
+            text-align: center;
+            min-width: 120px;
+          }
+          
+          .get-code-button a:hover,
+          .get-code-link:hover {
+            background-color: #f40612;
+          }
+          
+          .email-content a:not(.get-code-link) {
+            color: #0071eb;
+            text-decoration: underline;
+          }
+          
+          .email-content img {
+            max-width: 100%;
+            height: auto;
+          }
+          
+          .email-content button {
+            cursor: pointer;
+            border: none;
+            display: inline-block;
+            visibility: visible !important;
+            opacity: 1 !important;
+          }
+        </style>
+        <div class="email-content">
           ${sanitized}
         </div>
       `;
+
+      return styledContent;
     } else {
-      // Convert plain text to HTML
+      // For plain text emails, convert "Get Code" text to buttons
+      const textWithButtons = content
+        .replace(
+          /Get\s+Code/gi,
+          '<button class="get-code-button" style="display: inline-block !important; visibility: visible !important; opacity: 1 !important; background-color: #e50914; color: white; padding: 12px 24px; border-radius: 4px; font-weight: bold; margin: 10px 0; cursor: pointer; border: none; text-decoration: none;">Get Code</button>'
+        );
+
       return `
-        <div class="email-content" style="
-          font-family: Arial, sans-serif;
-          line-height: 1.6;
-          color: #FFFFFF;
-          white-space: pre-wrap;
-          max-width: 100%;
-          overflow-wrap: break-word;
-        ">
-          ${content
+        <style>
+          .email-content {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            color: #FFFFFF;
+            white-space: pre-wrap;
+            max-width: 100%;
+            overflow-wrap: break-word;
+          }
+          
+          .get-code-button {
+            display: inline-block !important;
+            visibility: visible !important;
+            opacity: 1 !important;
+            background-color: #e50914;
+            color: white;
+            padding: 12px 24px;
+            border-radius: 4px;
+            font-weight: bold;
+            margin: 10px 0;
+            cursor: pointer;
+            border: none;
+            text-decoration: none;
+          }
+          
+          .get-code-button:hover {
+            background-color: #f40612;
+          }
+        </style>
+        <div class="email-content">
+          ${textWithButtons
             .replace(/&/g, '&amp;')
             .replace(/</g, '&lt;')
             .replace(/>/g, '&gt;')

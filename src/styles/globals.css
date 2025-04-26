@@ -47,4 +47,38 @@
 .sidebar-exit-active {
   transform: translateX(100%);
   transition: transform 300ms ease-in-out;
+}
+
+/* Email button styles */
+.email-content .get-code-button,
+.email-content .get-code-link {
+  display: inline-block !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  background-color: #e50914;
+  color: white !important;
+  padding: 12px 24px;
+  border-radius: 4px;
+  font-weight: bold;
+  margin: 10px 0;
+  text-decoration: none;
+  text-align: center;
+  min-width: 120px;
+  cursor: pointer;
+  border: none;
+  transition: background-color 0.2s;
+}
+
+.email-content .get-code-button:hover,
+.email-content .get-code-link:hover {
+  background-color: #f40612;
+}
+
+/* Override any hidden styles */
+.email-content [style*="display: none"],
+.email-content [style*="visibility: hidden"],
+.email-content [style*="opacity: 0"] {
+  display: inline-block !important;
+  visibility: visible !important;
+  opacity: 1 !important;
 } 

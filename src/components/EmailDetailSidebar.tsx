@@ -472,6 +472,24 @@ Original email may contain HTML content that could not be processed.`;
     }
   };
 
+  // Add handler for Get Code buttons
+  const handleGetCode = (e: React.MouseEvent<HTMLElement>) => {
+    const target = e.target as HTMLElement;
+    if (target.closest('.get-code-button, .get-code-link')) {
+      e.preventDefault();
+      // Ensure the button is visible and clickable
+      target.style.display = 'inline-block';
+      target.style.visibility = 'visible';
+      target.style.opacity = '1';
+      
+      // If it's a link, open in new tab
+      const link = target.closest('a');
+      if (link) {
+        window.open(link.href, '_blank', 'noopener,noreferrer');
+      }
+    }
+  };
+
   if (!isOpen || !email) return null;
 
   return (
@@ -536,8 +554,21 @@ Original email may contain HTML content that could not be processed.`;
               ) : (
                 <div 
                   className="prose prose-invert max-w-none"
-                  dangerouslySetInnerHTML={{ __html: cleanEmailBody(email.body || '') }}
-                />
+                  onClick={handleGetCode}
+                >
+                  {email.hasFullContent ? (
+                    <div 
+                      className="email-content"
+                      dangerouslySetInnerHTML={{ 
+                        __html: email.formattedBody || email.body 
+                      }} 
+                    />
+                  ) : (
+                    <div className="text-gray-400">
+                      {email.body}
+                    </div>
+                  )}
+                </div>
               )}
               
               {email.isForwardedEmail && (
