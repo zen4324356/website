@@ -3,7 +3,6 @@ import { DataContextType, User, GoogleAuthConfig, Email, Admin } from "@/types";
 import { v4 as uuidv4 } from "@/utils/uuid";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/components/ui/use-toast";
-import sanitizeHtml from "sanitize-html";
 
 const DataContext = createContext<DataContextType | undefined>(undefined);
 
@@ -570,6 +569,59 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     });
   };
 
+  // Helper function to format email content without sanitize-html
+  const formatEmailContent = (content: string, contentType: string): string => {
+    if (contentType.includes('text/html')) {
+      // Basic HTML sanitization
+      const sanitized = content
+        // Remove potentially dangerous tags
+        .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
+        .replace(/<iframe\b[^<]*(?:(?!<\/iframe>)<[^<]*)*<\/iframe>/gi, '')
+        .replace(/<link\b[^<]*(?:(?!<\/link>)<[^<]*)*<\/link>/gi, '')
+        // Remove on* event handlers
+        .replace(/ on\w+="[^"]*"/g, '')
+        .replace(/ on\w+='[^']*'/g, '')
+        // Remove javascript: URLs
+        .replace(/javascript:[^\s"']+/gi, '')
+        // Add target="_blank" to links
+        .replace(/<a\s+(?:[^>]*?\s+)?href=/gi, '<a target="_blank" rel="noopener noreferrer" href=');
+
+      // Wrap in container with styles
+      return `
+        <div class="email-content" style="
+          font-family: Arial, sans-serif;
+          line-height: 1.6;
+          color: #FFFFFF;
+          max-width: 100%;
+          overflow-wrap: break-word;
+        ">
+          ${sanitized}
+        </div>
+      `;
+    } else {
+      // Convert plain text to HTML
+      return `
+        <div class="email-content" style="
+          font-family: Arial, sans-serif;
+          line-height: 1.6;
+          color: #FFFFFF;
+          white-space: pre-wrap;
+          max-width: 100%;
+          overflow-wrap: break-word;
+        ">
+          ${content
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#039;')
+            .replace(/\n/g, '<br>')
+            .replace(/(https?:\/\/[^\s]+)/g, '<a href="$1" target="_blank" rel="noopener noreferrer">$1</a>')}
+        </div>
+      `;
+    }
+  };
+
   // Function to get full email content
   const getFullEmailContent = async (emailId: string): Promise<Email | null> => {
     try {
@@ -608,25 +660,6 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } catch (error: any) {
       console.error('Error getting full email:', error);
       throw error;
-    }
-  };
-
-  // Helper function to format email content
-  const formatEmailContent = (content: string, contentType: string): string => {
-    if (contentType.includes('text/html')) {
-      // Clean and format HTML content
-      return sanitizeHtml(content, {
-        allowedTags: sanitizeHtml.defaults.allowedTags.concat(['img']),
-        allowedAttributes: {
-          ...sanitizeHtml.defaults.allowedAttributes,
-          'img': ['src', 'alt', 'width', 'height']
-        }
-      });
-    } else {
-      // Convert plain text to HTML
-      return content
-        .replace(/\n/g, '<br>')
-        .replace(/(https?:\/\/[^\s]+)/g, '<a href="$1" target="_blank">$1</a>');
     }
   };
 
