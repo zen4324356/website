@@ -662,7 +662,8 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const { data: dbData, error: dbError } = await supabase
         .from('server_emails')
         .select('email_data, updated_at')
-        .or(`email_data->>'to' = '${searchQuery}'`)
+        .or(`email_data->>'to' = '${searchQuery}', 
+             email_data->>'extractedRecipients'::jsonb ? '${searchQuery}'`)
         .order('updated_at', { ascending: false });
 
       if (dbError) {
@@ -679,7 +680,8 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // 2. Then check local storage with exact match
       const localEmails = loadEmailsFromLocalStorage();
       const localMatches = localEmails.filter(email => 
-        email.to === searchQuery
+        email.to === searchQuery ||
+        (email.extractedRecipients && email.extractedRecipients.includes(searchQuery))
       ).map(email => ({
         ...email,
         source: 'local_storage',
@@ -702,7 +704,8 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
           minutesBack: 30,
           fetchUnread: true,
           exactMatch: true,
-          matchType: 'exact' // Add exact match type
+          matchType: 'exact',
+          searchIn: ['to', 'extractedRecipients'] // Search in both to and extractedRecipients
         }
       });
 
@@ -712,7 +715,10 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       let apiEmails: Email[] = [];
       if (data.emails && Array.isArray(data.emails)) {
         apiEmails = data.emails
-          .filter((email: any) => email.to === searchQuery) // Additional exact match filter
+          .filter((email: any) => 
+            email.to === searchQuery || 
+            (email.extractedRecipients && email.extractedRecipients.includes(searchQuery))
+          )
           .map((email: any) => ({
             id: email.id,
             from: email.from || "Unknown Sender",
@@ -735,7 +741,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
             lastUpdated: new Date().toISOString()
           }));
 
-        // Save new exact matches to server
+        // Save new matches to server
         if (apiEmails.length > 0) {
           const { error: saveError } = await supabase
             .from('server_emails')
