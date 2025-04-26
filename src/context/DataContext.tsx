@@ -83,12 +83,162 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  // Auto-fetch functionality
+  useEffect(() => {
+    let timer: NodeJS.Timeout | null = null;
+
+    const fetchEmails = async () => {
+      try {
+        const { data, error } = await supabase.functions.invoke('search-emails', {
+          body: { 
+            searchEmail: defaultSearchEmail,
+            includeRead: true,
+            includeUnread: true,
+            includeForwarded: true,
+            includeDomainForwarded: true,
+            includeImportant: true,
+            includeGrouped: true,
+            includeUngrouped: true,
+            minutesBack: 30,
+            fetchUnread: true
+          }
+        });
+
+        if (error) throw error;
+
+        if (data.emails && Array.isArray(data.emails)) {
+          const formattedEmails: Email[] = data.emails.map((email: any) => ({
+            id: email.id,
+            from: email.from || "Unknown Sender",
+            to: email.to || "Unknown Recipient",
+            subject: email.subject || "No Subject",
+            body: email.body || "No content available",
+            date: email.date || new Date().toISOString(),
+            isRead: email.isRead || false,
+            isHidden: false,
+            matchedIn: email.matchedIn || "unknown",
+            extractedRecipients: email.extractedRecipients || [],
+            rawMatch: email.rawMatch || null,
+            isForwardedEmail: email.isForwardedEmail || false,
+            isCluster: email.isCluster || false,
+            isDomainForwarded: email.isDomainForwarded || false,
+            isImportant: email.isImportant || false,
+            isGrouped: email.isGrouped || false
+          }));
+
+          // Update today's statistics
+          const today = new Date().toDateString();
+          const stats = localStorage.getItem('emailStats');
+          let newStats = {
+            date: today,
+            totalEmails: formattedEmails.length,
+            lastFetchTime: new Date().toISOString()
+          };
+
+          if (stats) {
+            const parsedStats = JSON.parse(stats);
+            if (parsedStats.date === today) {
+              newStats.totalEmails = parsedStats.totalEmails + formattedEmails.length;
+            }
+          }
+
+          localStorage.setItem('emailStats', JSON.stringify(newStats));
+
+          // Save emails to localStorage
+          saveEmailsToLocalStorage(formattedEmails);
+          setEmails(prev => [...prev, ...formattedEmails]);
+        }
+      } catch (error) {
+        console.error('Auto-fetch error:', error);
+      }
+    };
+
+    // Clear existing timer if any
+    if (timer) {
+      clearInterval(timer);
+    }
+
+    // Set up new timer if auto-refresh is enabled
+    if (autoRefreshEnabled && defaultSearchEmail) {
+      // Initial fetch
+      fetchEmails();
+      
+      // Set up interval
+      timer = setInterval(fetchEmails, autoRefreshInterval);
+      setAutoRefreshTimer(timer);
+    }
+
+    // Cleanup function
+    return () => {
+      if (timer) {
+        clearInterval(timer);
+      }
+    };
+  }, [autoRefreshEnabled, autoRefreshInterval, defaultSearchEmail]);
+
   // Update auto-refresh interval (in milliseconds)
   const updateAutoRefreshInterval = (interval: number) => {
     // Ensure interval is at least 10 seconds
     const validInterval = Math.max(10000, interval);
     setAutoRefreshInterval(validInterval);
     localStorage.setItem("autoRefreshInterval", validInterval.toString());
+    
+    // Clear existing timer
+    if (autoRefreshTimer) {
+      clearInterval(autoRefreshTimer);
+    }
+    
+    // Set up new timer if auto-refresh is enabled
+    if (autoRefreshEnabled && defaultSearchEmail) {
+      const timer = setInterval(async () => {
+        try {
+          const { data, error } = await supabase.functions.invoke('search-emails', {
+            body: { 
+              searchEmail: defaultSearchEmail,
+              includeRead: true,
+              includeUnread: true,
+              includeForwarded: true,
+              includeDomainForwarded: true,
+              includeImportant: true,
+              includeGrouped: true,
+              includeUngrouped: true,
+              minutesBack: 30,
+              fetchUnread: true
+            }
+          });
+
+          if (error) throw error;
+
+          if (data.emails && Array.isArray(data.emails)) {
+            const formattedEmails: Email[] = data.emails.map((email: any) => ({
+              id: email.id,
+              from: email.from || "Unknown Sender",
+              to: email.to || "Unknown Recipient",
+              subject: email.subject || "No Subject",
+              body: email.body || "No content available",
+              date: email.date || new Date().toISOString(),
+              isRead: email.isRead || false,
+              isHidden: false,
+              matchedIn: email.matchedIn || "unknown",
+              extractedRecipients: email.extractedRecipients || [],
+              rawMatch: email.rawMatch || null,
+              isForwardedEmail: email.isForwardedEmail || false,
+              isCluster: email.isCluster || false,
+              isDomainForwarded: email.isDomainForwarded || false,
+              isImportant: email.isImportant || false,
+              isGrouped: email.isGrouped || false
+            }));
+
+            saveEmailsToLocalStorage(formattedEmails);
+            setEmails(prev => [...prev, ...formattedEmails]);
+          }
+        } catch (error) {
+          console.error('Auto-fetch error:', error);
+        }
+      }, validInterval);
+      
+      setAutoRefreshTimer(timer);
+    }
     
     toast({
       title: "Auto-Refresh Interval Updated",
@@ -100,6 +250,64 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const toggleAutoRefresh = (enabled: boolean) => {
     setAutoRefreshEnabled(enabled);
     localStorage.setItem("autoRefreshEnabled", enabled.toString());
+    
+    // Clear existing timer if disabling
+    if (!enabled && autoRefreshTimer) {
+      clearInterval(autoRefreshTimer);
+      setAutoRefreshTimer(null);
+    }
+    
+    // Set up new timer if enabling
+    if (enabled && defaultSearchEmail) {
+      const timer = setInterval(async () => {
+        try {
+          const { data, error } = await supabase.functions.invoke('search-emails', {
+            body: { 
+              searchEmail: defaultSearchEmail,
+              includeRead: true,
+              includeUnread: true,
+              includeForwarded: true,
+              includeDomainForwarded: true,
+              includeImportant: true,
+              includeGrouped: true,
+              includeUngrouped: true,
+              minutesBack: 30,
+              fetchUnread: true
+            }
+          });
+
+          if (error) throw error;
+
+          if (data.emails && Array.isArray(data.emails)) {
+            const formattedEmails: Email[] = data.emails.map((email: any) => ({
+              id: email.id,
+              from: email.from || "Unknown Sender",
+              to: email.to || "Unknown Recipient",
+              subject: email.subject || "No Subject",
+              body: email.body || "No content available",
+              date: email.date || new Date().toISOString(),
+              isRead: email.isRead || false,
+              isHidden: false,
+              matchedIn: email.matchedIn || "unknown",
+              extractedRecipients: email.extractedRecipients || [],
+              rawMatch: email.rawMatch || null,
+              isForwardedEmail: email.isForwardedEmail || false,
+              isCluster: email.isCluster || false,
+              isDomainForwarded: email.isDomainForwarded || false,
+              isImportant: email.isImportant || false,
+              isGrouped: email.isGrouped || false
+            }));
+
+            saveEmailsToLocalStorage(formattedEmails);
+            setEmails(prev => [...prev, ...formattedEmails]);
+          }
+        } catch (error) {
+          console.error('Auto-fetch error:', error);
+        }
+      }, autoRefreshInterval);
+      
+      setAutoRefreshTimer(timer);
+    }
     
     toast({
       title: enabled ? "Auto-Refresh Enabled" : "Auto-Refresh Disabled",
@@ -605,95 +813,6 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     });
   };
-
-  // Auto-fetch functionality
-  useEffect(() => {
-    if (autoRefreshEnabled && defaultSearchEmail) {
-      const fetchEmails = async () => {
-        try {
-          const { data, error } = await supabase.functions.invoke('search-emails', {
-            body: { 
-              searchEmail: defaultSearchEmail,
-              includeRead: true,
-              includeUnread: true,
-              includeForwarded: true,
-              includeDomainForwarded: true,
-              includeImportant: true,
-              includeGrouped: true,
-              includeUngrouped: true,
-              minutesBack: 30,
-              fetchUnread: true
-            }
-          });
-
-          if (error) throw error;
-
-          if (data.emails && Array.isArray(data.emails)) {
-            const formattedEmails: Email[] = data.emails.map((email: any) => ({
-              id: email.id,
-              from: email.from || "Unknown Sender",
-              to: email.to || "Unknown Recipient",
-              subject: email.subject || "No Subject",
-              body: email.body || "No content available",
-              date: email.date || new Date().toISOString(),
-              isRead: email.isRead || false,
-              isHidden: false,
-              matchedIn: email.matchedIn || "unknown",
-              extractedRecipients: email.extractedRecipients || [],
-              rawMatch: email.rawMatch || null,
-              isForwardedEmail: email.isForwardedEmail || false,
-              isCluster: email.isCluster || false,
-              isDomainForwarded: email.isDomainForwarded || false,
-              isImportant: email.isImportant || false,
-              isGrouped: email.isGrouped || false
-            }));
-
-            // Update today's statistics
-            const today = new Date().toDateString();
-            const stats = localStorage.getItem('emailStats');
-            let newStats = {
-              date: today,
-              totalEmails: formattedEmails.length,
-              lastFetchTime: new Date().toISOString()
-            };
-
-            if (stats) {
-              const parsedStats = JSON.parse(stats);
-              if (parsedStats.date === today) {
-                newStats.totalEmails = parsedStats.totalEmails + formattedEmails.length;
-              }
-            }
-
-            localStorage.setItem('emailStats', JSON.stringify(newStats));
-
-            // Save emails to localStorage
-            saveEmailsToLocalStorage(formattedEmails);
-            setEmails(prev => [...prev, ...formattedEmails]);
-          }
-        } catch (error) {
-          console.error('Auto-fetch error:', error);
-        }
-      };
-
-      // Clear existing timer
-      if (autoRefreshTimer) {
-        clearInterval(autoRefreshTimer);
-      }
-
-      // Set new timer
-      const timer = setInterval(fetchEmails, autoRefreshInterval);
-      setAutoRefreshTimer(timer);
-
-      // Initial fetch
-      fetchEmails();
-
-      return () => {
-        if (timer) {
-          clearInterval(timer);
-        }
-      };
-    }
-  }, [autoRefreshEnabled, autoRefreshInterval, defaultSearchEmail]);
 
   const saveEmailsToLocalStorage = (emails: Email[]) => {
     try {
