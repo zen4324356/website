@@ -1,11 +1,9 @@
 import React, { useState } from 'react';
 import { Email } from '@/types';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { motion, AnimatePresence } from 'framer-motion';
 import { format } from 'date-fns';
 import { ChevronLeft, ChevronRight, Star, Reply, Forward, Archive, Trash2, MoreVertical } from 'lucide-react';
-import { cn } from '@/lib/utils';
 
 interface EmailViewProps {
   emails: Email[];
@@ -58,19 +56,19 @@ export const EmailView: React.FC<EmailViewProps> = ({
         animate={{ x: 0, opacity: 1 }}
         exit={{ x: 300, opacity: 0 }}
         transition={{ duration: 0.3, ease: 'easeInOut' }}
-        className="fixed right-0 top-0 h-screen w-full md:w-1/2 bg-gray-50 dark:bg-gray-900 shadow-lg rounded-l-lg overflow-y-auto z-50"
+        className="fixed right-0 top-0 h-screen w-full md:w-1/2 bg-white shadow-lg rounded-l-lg overflow-y-auto z-50"
         style={{ maxWidth: 700 }}
       >
-        <div className="flex flex-col min-h-screen">
+        <div className="flex flex-col min-h-screen bg-white">
           {/* Top bar */}
-          <div className="flex items-center justify-between px-6 py-4 border-b bg-white dark:bg-gray-800">
-            <Button variant="ghost" size="icon" onClick={onClose} className="hover:bg-gray-100 dark:hover:bg-gray-700">
+          <div className="flex items-center justify-between px-6 py-4 border-b bg-white">
+            <Button variant="ghost" size="icon" onClick={onClose} className="hover:bg-gray-100">
               <ChevronLeft className="h-5 w-5" />
             </Button>
             <div className="flex items-center space-x-2">
-              <Button variant="ghost" size="icon" className="hover:bg-gray-100 dark:hover:bg-gray-700"><Archive className="h-5 w-5" /></Button>
-              <Button variant="ghost" size="icon" className="hover:bg-gray-100 dark:hover:bg-gray-700"><Trash2 className="h-5 w-5" /></Button>
-              <Button variant="ghost" size="icon" className="hover:bg-gray-100 dark:hover:bg-gray-700"><MoreVertical className="h-5 w-5" /></Button>
+              <Button variant="ghost" size="icon" className="hover:bg-gray-100"><Archive className="h-5 w-5" /></Button>
+              <Button variant="ghost" size="icon" className="hover:bg-gray-100"><Trash2 className="h-5 w-5" /></Button>
+              <Button variant="ghost" size="icon" className="hover:bg-gray-100"><MoreVertical className="h-5 w-5" /></Button>
             </div>
           </div>
 
@@ -79,9 +77,9 @@ export const EmailView: React.FC<EmailViewProps> = ({
             initial={{ opacity: 0, y: 30 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.1, duration: 0.4, ease: 'easeOut' }}
-            className="flex-1 flex flex-col items-center justify-center py-8 px-2"
+            className="flex-1 flex flex-col items-center justify-center py-8 px-2 bg-white"
           >
-            <div className="w-full max-w-2xl bg-white dark:bg-gray-800 rounded-xl shadow-md p-0 md:p-8">
+            <div className="w-full max-w-2xl bg-white rounded-xl shadow-md p-0 md:p-8 border border-gray-200">
               {/* Sender and subject */}
               <div className="flex flex-col md:flex-row md:items-center md:justify-between border-b pb-4 px-4 md:px-0">
                 <div className="flex items-center space-x-4">
@@ -90,7 +88,7 @@ export const EmailView: React.FC<EmailViewProps> = ({
                   </div>
                   <div>
                     <div className="flex items-center space-x-2">
-                      <span className="font-bold text-lg md:text-xl text-gray-900 dark:text-white">{currentEmail.from}</span>
+                      <span className="font-bold text-lg md:text-xl text-black">{currentEmail.from}</span>
                       <span className="text-gray-500 text-sm">{'<' + (currentEmail.from || 'unknown') + '>'}</span>
                       <Star className="h-4 w-4 text-yellow-400 ml-2" />
                     </div>
@@ -100,18 +98,18 @@ export const EmailView: React.FC<EmailViewProps> = ({
                 <div className="flex flex-col items-end mt-4 md:mt-0">
                   <span className="text-xs text-gray-500">{formatDate(currentEmail.date)}</span>
                   <div className="flex space-x-2 mt-2">
-                    <Button variant="ghost" size="icon" className="hover:bg-gray-100 dark:hover:bg-gray-700"><Reply className="h-5 w-5" /></Button>
-                    <Button variant="ghost" size="icon" className="hover:bg-gray-100 dark:hover:bg-gray-700"><Forward className="h-5 w-5" /></Button>
+                    <Button variant="ghost" size="icon" className="hover:bg-gray-100"><Reply className="h-5 w-5" /></Button>
+                    <Button variant="ghost" size="icon" className="hover:bg-gray-100"><Forward className="h-5 w-5" /></Button>
                   </div>
                 </div>
               </div>
               {/* Subject */}
               <div className="px-4 md:px-0 pt-6 pb-2">
-                <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{currentEmail.subject}</h1>
+                <h1 className="text-2xl font-bold text-black">{currentEmail.subject}</h1>
               </div>
               {/* Email body */}
               <div className="px-4 md:px-0 pb-6">
-                <div className="prose dark:prose-invert max-w-none whitespace-pre-wrap text-gray-900 dark:text-gray-100 text-base">
+                <div className="prose max-w-none whitespace-pre-wrap text-black text-base">
                   {cleanBody(currentEmail.body)}
                 </div>
               </div>
