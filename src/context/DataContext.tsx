@@ -11,6 +11,18 @@ interface SearchConfig {
   includeOldEmails: boolean;
 }
 
+interface GmailEmail {
+  id: string;
+  threadId: string;
+  raw?: string;
+  payload?: {
+    headers: Array<{ name: string; value: string }>;
+    parts?: any[];
+    body?: { data?: string; size?: number };
+    mimeType?: string;
+  };
+}
+
 export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   // Access Tokens
   const [accessTokens, setAccessTokens] = useState<User[]>([]);
@@ -716,11 +728,11 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return JSON.parse(cachedEmail);
       }
 
-      // If not in cache, fetch from API
+      // Fetch full email using Gmail API
       const { data, error } = await supabase.functions.invoke('get-email-content', {
         body: { 
           emailId,
-          format: 'full'
+          format: 'raw' // Request raw format to get complete email
         }
       });
 
@@ -728,23 +740,145 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (data.error) throw new Error(data.error);
 
       if (data.email) {
-        // Format the email content
-        const formattedEmail = {
-          ...data.email,
-          hasFullContent: true,
-          formattedBody: formatEmailContent(data.email.body, data.email.contentType)
-        };
+        // Process and format the email
+        const processedEmail = await processRawEmail(data.email);
+        
+        // Cache the processed email
+        localStorage.setItem(`email_${emailId}`, JSON.stringify(processedEmail));
 
-        // Save to localStorage
-        localStorage.setItem(`email_${emailId}`, JSON.stringify(formattedEmail));
-
-        return formattedEmail;
+        return processedEmail;
       }
 
       return null;
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error getting full email:', error);
       throw error;
+    }
+  };
+
+  const processRawEmail = async (rawEmail: GmailEmail): Promise<Email> => {
+    try {
+      // Extract headers
+      const headers = rawEmail.payload?.headers || [];
+      const getHeader = (name: string) => 
+        headers.find(h => h.name.toLowerCase() === name.toLowerCase())?.value || '';
+
+      // Extract body content
+      let bodyContent = '';
+      let htmlContent = '';
+      let plainContent = '';
+
+      const processMessagePart = (part: any) => {
+        if (!part) return;
+
+        if (part.body?.data) {
+          const content = decodeBase64UrlSafe(part.body.data);
+          if (part.mimeType === 'text/html') {
+            htmlContent = content;
+          } else if (part.mimeType === 'text/plain') {
+            plainContent = content;
+          }
+        }
+
+        if (part.parts) {
+          part.parts.forEach(processMessagePart);
+        }
+      };
+
+      processMessagePart(rawEmail.payload);
+
+      // Prefer HTML content, fallback to plain text
+      if (htmlContent) {
+        bodyContent = await cleanHtmlContent(htmlContent);
+      } else if (plainContent) {
+        bodyContent = plainContent;
+      }
+
+      return {
+        id: rawEmail.id,
+        threadId: rawEmail.threadId,
+        from: getHeader('From'),
+        to: getHeader('To'),
+        subject: getHeader('Subject'),
+        date: getHeader('Date'),
+        body: bodyContent,
+        isRead: true,
+        isHidden: false,
+        hasFullContent: true
+      };
+    } catch (error) {
+      console.error('Error processing raw email:', error);
+      throw error;
+    }
+  };
+
+  const cleanHtmlContent = async (html: string): Promise<string> => {
+    try {
+      // Create a DOMParser to parse HTML
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(html, 'text/html');
+
+      // Remove script tags
+      doc.querySelectorAll('script').forEach(el => el.remove());
+      doc.querySelectorAll('style').forEach(el => el.remove());
+
+      // Process all elements to clean them
+      const processNode = (node: Element) => {
+        // Remove all style attributes
+        node.removeAttribute('style');
+        
+        // Remove all event handlers
+        const attrs = node.attributes;
+        for (let i = attrs.length - 1; i >= 0; i--) {
+          const attr = attrs[i];
+          if (attr.name.startsWith('on')) {
+            node.removeAttribute(attr.name);
+          }
+        }
+
+        // Process child elements
+        node.querySelectorAll('*').forEach(processNode);
+      };
+
+      processNode(doc.body);
+
+      // Extract text content while preserving basic formatting
+      const cleanContent = doc.body.innerHTML
+        .replace(/<div[^>]*>/gi, '\n')
+        .replace(/<\/div>/gi, '')
+        .replace(/<p[^>]*>/gi, '\n')
+        .replace(/<\/p>/gi, '\n')
+        .replace(/<br[^>]*>/gi, '\n')
+        .replace(/<[^>]+>/g, '') // Remove remaining HTML tags
+        .replace(/&nbsp;/g, ' ')
+        .replace(/\n\s*\n/g, '\n\n') // Remove extra blank lines
+        .trim();
+
+      return cleanContent;
+    } catch (error) {
+      console.error('Error cleaning HTML content:', error);
+      return html; // Return original content if cleaning fails
+    }
+  };
+
+  const decodeBase64UrlSafe = (encoded: string): string => {
+    try {
+      // Replace URL-safe characters
+      const base64 = encoded
+        .replace(/-/g, '+')
+        .replace(/_/g, '/');
+
+      // Add padding if needed
+      const pad = base64.length % 4;
+      const padded = pad 
+        ? base64 + '='.repeat(4 - pad)
+        : base64;
+
+      // Decode
+      return decodeURIComponent(escape(atob(padded)));
+    } catch (error) {
+      console.error('Error decoding base64:', error);
+      return '';
     }
   };
 

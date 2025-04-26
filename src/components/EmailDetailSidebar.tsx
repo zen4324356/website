@@ -507,122 +507,43 @@ Original email may contain HTML content that could not be processed.`;
           <X className="h-5 w-5" />
         </button>
       </div>
-      
-      <div className="p-4">
-        {email ? (
-          <>
-            <div className="space-y-4 mb-6">
-              <div className="flex justify-between">
-                <h3 className="text-lg font-medium text-over-video">{email.subject || 'No Subject'}</h3>
-                {email.rawContent && (
-                  <button 
-                    onClick={handleDownload} 
-                    className="netflix-button button-over-video">
-                    Download
-                  </button>
-                )}
-              </div>
-              
-              <div className="grid grid-cols-[auto,1fr] gap-2 text-sm text-netflix-lightgray">
-                <span className="text-blue-500">From:</span>
-                <span className="text-blue-500">{email.from || 'Unknown'}</span>
-                
-                <span className="text-blue-500">To:</span>
-                <span className="text-blue-500">{email.to || 'Unknown'}</span>
-                
-                <span className="text-blue-500">Date:</span>
-                <span className="text-blue-500">{email.date ? new Date(email.date).toLocaleString() : 'Unknown'}</span>
-              </div>
-            </div>
-            
-            <div className="border-t border-netflix-lightgray pt-4">
-              <div className="mb-4 flex justify-between">
-                <h4 className="text-md font-medium text-blue-500">Content</h4>
-                <div className="flex space-x-2">
-                  <button 
-                    onClick={() => setShowRawHeaders(!showRawHeaders)} 
-                    className="netflix-button button-over-video">
-                    {showRawHeaders ? 'Show Formatted' : 'Show Raw'}
-                  </button>
-                </div>
-              </div>
-              
-              {showRawHeaders ? (
-                <pre className="whitespace-pre-wrap bg-netflix-gray p-3 rounded text-xs overflow-x-auto">
-                  {email.rawContent || email.body || 'No content available'}
-                </pre>
-              ) : (
-                <div 
-                  className="prose prose-invert max-w-none"
-                  onClick={handleGetCode}
-                >
-                  {email.hasFullContent ? (
-                    <div 
-                      className="email-content"
-                      dangerouslySetInnerHTML={{ 
-                        __html: email.formattedBody || email.body 
-                      }} 
-                    />
-                  ) : (
-                    <div className="text-gray-400">
-                      {email.body}
-                    </div>
-                  )}
-                </div>
-              )}
-              
-              {email.isForwardedEmail && (
-                <div className="mt-6 border-t border-netflix-lightgray pt-4">
-                  <h4 className="text-md font-medium mb-2 text-blue-500">Forwarded Content</h4>
-                  <div className="bg-netflix-darkgray p-3 rounded content-card">
-                    {email.forwardedContent && Array.isArray(email.forwardedContent) && email.forwardedContent.map((fwd, index) => (
-                      <div key={index} className="mb-4 last:mb-0 border-b border-netflix-lightgray last:border-0 pb-4 last:pb-0">
-                        <div className="grid grid-cols-[auto,1fr] gap-2 text-sm text-netflix-lightgray mb-2">
-                          {fwd.from && (
-                            <>
-                              <span className="text-blue-500">From:</span>
-                              <span className="text-blue-500">{fwd.from}</span>
-                            </>
-                          )}
-                          
-                          {fwd.to && (
-                            <>
-                              <span className="text-blue-500">To:</span>
-                              <span className="text-blue-500">{fwd.to}</span>
-                            </>
-                          )}
-                          
-                          {fwd.subject && (
-                            <>
-                              <span className="text-blue-500">Subject:</span>
-                              <span className="text-blue-500">{fwd.subject}</span>
-                            </>
-                          )}
-                          
-                          {fwd.date && (
-                            <>
-                              <span className="text-blue-500">Date:</span>
-                              <span className="text-blue-500">{fwd.date}</span>
-                            </>
-                          )}
-                        </div>
-                        
-                        <div 
-                          className="prose prose-invert max-w-none text-sm"
-                          dangerouslySetInnerHTML={{ __html: cleanEmailBody(fwd.body || '') }}
-                        />
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-          </>
-        ) : (
-          <div className="flex justify-center items-center h-64">
-            <p className="text-netflix-lightgray text-over-video">Select an email to view details</p>
+
+      {/* Email content */}
+      <div className="flex-1 overflow-auto p-4">
+        {/* Subject */}
+        <h1 className="text-xl font-semibold mb-4">{email.subject}</h1>
+
+        {/* Sender info */}
+        <div className="flex items-start gap-3 mb-4">
+          <div className="w-8 h-8 rounded-full bg-netflix-red flex items-center justify-center">
+            <span className="text-white font-semibold">
+              {email.from.charAt(0).toUpperCase()}
+            </span>
           </div>
-        )}
+          <div>
+            <div className="font-semibold">{email.from}</div>
+            <div className="text-sm text-gray-400">
+              to {email.to}
+            </div>
+            <div className="text-sm text-gray-400">
+              {new Date(email.date).toLocaleString()}
+            </div>
+          </div>
+        </div>
+
+        {/* Email body */}
+        <div className="prose prose-invert max-w-none">
+          <div 
+            className="email-content whitespace-pre-wrap"
+            style={{ 
+              fontFamily: 'Arial, sans-serif',
+              lineHeight: '1.6',
+              color: '#FFFFFF'
+            }}
+          >
+            {email.body}
+          </div>
+        </div>
       </div>
     </div>
   );

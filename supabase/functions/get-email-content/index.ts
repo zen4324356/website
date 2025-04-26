@@ -68,14 +68,19 @@ function decodeBase64(encoded: string): string {
 
 serve(async (req) => {
   try {
-    const { emailId, format } = await req.json();
+    const { emailId } = await req.json();
+    const token = req.headers.get('Authorization')?.split('Bearer ')[1];
 
-    // Get email content from Gmail API
+    if (!token) {
+      throw new Error('No authorization token provided');
+    }
+
+    // Fetch raw email content
     const response = await fetch(
-      `https://gmail.googleapis.com/gmail/v1/users/me/messages/${emailId}?format=${format}`,
+      `https://gmail.googleapis.com/gmail/v1/users/me/messages/${emailId}?format=raw`,
       {
         headers: {
-          'Authorization': `Bearer ${req.headers.get('Authorization')}`,
+          'Authorization': `Bearer ${token}`,
         },
       }
     );
@@ -86,11 +91,15 @@ serve(async (req) => {
 
     const data = await response.json();
 
-    const body = extractBody(data);
+    return new Response(
+      JSON.stringify({ email: data }),
+      { headers: { 'Content-Type': 'application/json' } }
+    );
 
-    return new Response(JSON.stringify({ body }));
   } catch (error) {
-    console.error('Error getting email content:', error);
-    return new Response(JSON.stringify({ error: error.message }), { status: 500 });
+    return new Response(
+      JSON.stringify({ error: error.message }),
+      { status: 500, headers: { 'Content-Type': 'application/json' } }
+    );
   }
 }); 

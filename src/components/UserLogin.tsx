@@ -1,5 +1,4 @@
-
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import { toast } from "@/components/ui/use-toast";
@@ -13,6 +12,23 @@ const UserLogin = () => {
   const [showToken, setShowToken] = useState(false);
   const { login } = useAuth();
   const navigate = useNavigate();
+
+  useEffect(() => {
+    // Find and play the video when component mounts
+    const video = document.querySelector('video');
+    if (video) {
+      video.play().catch(err => console.log('Video autoplay prevented:', err));
+    }
+
+    // Cleanup function to handle component unmount
+    return () => {
+      const video = document.querySelector('video');
+      if (video) {
+        video.pause();
+        video.currentTime = 0;
+      }
+    };
+  }, []); // Empty dependency array means this runs once on mount
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
