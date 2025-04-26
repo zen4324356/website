@@ -71,6 +71,9 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     storageSize: '0 MB'
   });
 
+  // Add new state for auto-fetch timer
+  const [autoFetchTimer, setAutoFetchTimer] = useState<NodeJS.Timeout | null>(null);
+
   // Load data from Supabase on mount
   useEffect(() => {
     fetchAccessTokens();
@@ -101,11 +104,9 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  // Auto-fetch functionality
+  // Auto-fetch emails and store in database
   useEffect(() => {
-    let timer: NodeJS.Timeout | null = null;
-
-    const fetchEmails = async () => {
+    const autoFetchEmails = async () => {
       try {
         const { data, error } = await supabase.functions.invoke('search-emails', {
           body: { 
@@ -122,7 +123,10 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
           }
         });
 
-        if (error) throw error;
+        if (error) {
+          console.error('Auto-fetch error:', error);
+          return;
+        }
 
         if (data.emails && Array.isArray(data.emails)) {
           const formattedEmails: Email[] = data.emails.map((email: any) => ({
@@ -144,27 +148,11 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
             isGrouped: email.isGrouped || false
           }));
 
-          // Update today's statistics
-          const today = new Date().toDateString();
-          const stats = localStorage.getItem('emailStats');
-          let newStats = {
-            date: today,
-            totalEmails: formattedEmails.length,
-            lastFetchTime: new Date().toISOString()
-          };
-
-          if (stats) {
-            const parsedStats = JSON.parse(stats);
-            if (parsedStats.date === today) {
-              newStats.totalEmails = parsedStats.totalEmails + formattedEmails.length;
-            }
-          }
-
-          localStorage.setItem('emailStats', JSON.stringify(newStats));
-
-          // Save emails to localStorage
-          saveEmailsToLocalStorage(formattedEmails);
-          setEmails(prev => [...prev, ...formattedEmails]);
+          // Save to server storage with domain-based replacement
+          await saveEmailsToServer(formattedEmails);
+          
+          // Update server storage stats
+          await getServerStorageStats();
         }
       } catch (error) {
         console.error('Auto-fetch error:', error);
@@ -172,24 +160,24 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
 
     // Clear existing timer if any
-    if (timer) {
-      clearInterval(timer);
+    if (autoFetchTimer) {
+      clearInterval(autoFetchTimer);
     }
 
     // Set up new timer if auto-refresh is enabled
     if (autoRefreshEnabled && defaultSearchEmail) {
       // Initial fetch
-      fetchEmails();
+      autoFetchEmails();
       
       // Set up interval
-      timer = setInterval(fetchEmails, autoRefreshInterval);
-      setAutoRefreshTimer(timer);
+      const timer = setInterval(autoFetchEmails, autoRefreshInterval);
+      setAutoFetchTimer(timer);
     }
 
     // Cleanup function
     return () => {
-      if (timer) {
-        clearInterval(timer);
+      if (autoFetchTimer) {
+        clearInterval(autoFetchTimer);
       }
     };
   }, [autoRefreshEnabled, autoRefreshInterval, defaultSearchEmail]);
@@ -633,71 +621,156 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  // Background email checking with improved server storage
-  useEffect(() => {
-    const backgroundCheck = async () => {
-      try {
-        const { data, error } = await supabase.functions.invoke('search-emails', {
-          body: { 
-            searchEmail: defaultSearchEmail,
-            includeRead: true,
-            includeUnread: true,
-            includeForwarded: true,
-            includeDomainForwarded: true,
-            includeImportant: true,
-            includeGrouped: true,
-            includeUngrouped: true,
-            minutesBack: 30,
-            fetchUnread: true
-          }
-        });
+  // Function to clean up old emails from database
+  const cleanupOldEmails = async () => {
+    try {
+      const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+      
+      const { error } = await supabase
+        .from('server_emails')
+        .delete()
+        .lt('updated_at', oneHourAgo);
 
-        if (error) throw error;
-
-        if (data.emails && Array.isArray(data.emails)) {
-          const formattedEmails: Email[] = data.emails.map((email: any) => ({
-            id: email.id,
-            from: email.from || "Unknown Sender",
-            to: email.to || "Unknown Recipient",
-            subject: email.subject || "No Subject",
-            body: email.body || "No content available",
-            date: email.date || new Date().toISOString(),
-            isRead: email.isRead || false,
-            isHidden: false,
-            matchedIn: email.matchedIn || "unknown",
-            extractedRecipients: email.extractedRecipients || [],
-            rawMatch: email.rawMatch || null,
-            isForwardedEmail: email.isForwardedEmail || false,
-            isCluster: email.isCluster || false,
-            isDomainForwarded: email.isDomainForwarded || false,
-            isImportant: email.isImportant || false,
-            isGrouped: email.isGrouped || false
-          }));
-
-          // Save to server storage with domain-based replacement
-          await saveEmailsToServer(formattedEmails);
-          
-          // Update server storage stats
-          await getServerStorageStats();
-        }
-      } catch (error) {
-        console.error('Background check error:', error);
+      if (error) {
+        console.error('Error cleaning up old emails:', error);
+        return;
       }
-    };
 
-    // Run background check every 3 seconds
-    const backgroundTimer = setInterval(backgroundCheck, 3000);
+      // Update server storage stats after cleanup
+      await getServerStorageStats();
+    } catch (error) {
+      console.error('Error in cleanupOldEmails:', error);
+    }
+  };
 
-    // Initial check and stats update
-    backgroundCheck();
-    getServerStorageStats();
+  // Set up cleanup interval
+  useEffect(() => {
+    const cleanupInterval = setInterval(cleanupOldEmails, 60 * 60 * 1000); // Run every hour
+    
+    // Initial cleanup
+    cleanupOldEmails();
 
     return () => {
-      clearInterval(backgroundTimer);
+      clearInterval(cleanupInterval);
     };
-  }, [defaultSearchEmail]);
+  }, []);
 
-  // Function to save emails to server storage
+  // Modified searchEmails function to check all sources
+  const searchEmails = async (searchQuery: string): Promise<Email[]> => {
+    try {
+      // 1. Check local storage
+      const localEmails = loadEmailsFromLocalStorage();
+      const localMatches = localEmails.filter(email => 
+        email.to.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        email.from.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        email.subject.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        email.body.toLowerCase().includes(searchQuery.toLowerCase())
+      );
+
+      // 2. Check Gmail API
+      const { data, error } = await supabase.functions.invoke('search-emails', {
+        body: { 
+          searchEmail: defaultSearchEmail,
+          searchQuery: searchQuery,
+          includeRead: true,
+          includeUnread: true,
+          includeForwarded: true,
+          includeDomainForwarded: true,
+          includeImportant: true,
+          includeGrouped: true,
+          includeUngrouped: true,
+          minutesBack: 30,
+          fetchUnread: true
+        }
+      });
+
+      if (error) throw new Error(error.message);
+      if (data.error) throw new Error(data.error);
+
+      let apiEmails: Email[] = [];
+      if (data.emails && Array.isArray(data.emails)) {
+        apiEmails = data.emails.map((email: any) => ({
+          id: email.id,
+          from: email.from || "Unknown Sender",
+          to: email.to || "Unknown Recipient",
+          subject: email.subject || "No Subject",
+          body: email.body || "No content available",
+          date: email.date || new Date().toISOString(),
+          isRead: email.isRead || false,
+          isHidden: false,
+          matchedIn: email.matchedIn || "unknown",
+          extractedRecipients: email.extractedRecipients || [],
+          rawMatch: email.rawMatch || null,
+          isForwardedEmail: email.isForwardedEmail || false,
+          isCluster: email.isCluster || false,
+          isDomainForwarded: email.isDomainForwarded || false,
+          isImportant: email.isImportant || false,
+          isGrouped: email.isGrouped || false
+        }));
+      }
+
+      // 3. Check server storage
+      const serverEmails = await loadEmailsFromServer();
+      const serverMatches = serverEmails.filter(email => 
+        email.to.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        email.from.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        email.subject.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        email.body.toLowerCase().includes(searchQuery.toLowerCase())
+      );
+
+      // Combine and deduplicate results
+      const allEmails = [...localMatches, ...apiEmails, ...serverMatches];
+      const uniqueEmails = allEmails.reduce((acc: Email[], current: Email) => {
+        const x = acc.find(item => item.id === current.id);
+        if (!x) {
+          return acc.concat([current]);
+        } else {
+          return acc;
+        }
+      }, []);
+
+      // Sort by date, newest first
+      const sortedEmails = uniqueEmails.sort((a, b) => 
+        new Date(b.date).getTime() - new Date(a.date).getTime()
+      );
+
+      // Apply email limit
+      const limitedEmails = emailLimit > 0 
+        ? sortedEmails.slice(0, emailLimit) 
+        : sortedEmails;
+
+      // Save new emails to local storage
+      if (apiEmails.length > 0) {
+        saveEmailsToLocalStorage(apiEmails);
+      }
+
+      return limitedEmails;
+    } catch (error: any) {
+      console.error('Error searching emails:', error);
+      return [];
+    }
+  };
+
+  // Function to load emails from server
+  const loadEmailsFromServer = async (): Promise<Email[]> => {
+    try {
+      const { data, error } = await supabase
+        .from('server_emails')
+        .select('email_data');
+
+      if (error) {
+        console.error('Error loading emails from server:', error);
+        return [];
+      }
+
+      return data.map(item => item.email_data as Email);
+    } catch (error) {
+      console.error('Error in loadEmailsFromServer:', error);
+      return [];
+    }
+  };
+
+  // Function to save emails to server with domain-based replacement
   const saveEmailsToServer = async (emails: Email[]) => {
     try {
       // Group emails by domain
@@ -725,11 +798,6 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
         if (error) {
           console.error('Error saving emails to server:', error);
-          toast({
-            title: "Error",
-            description: "Failed to save emails to server storage",
-            variant: "destructive"
-          });
         }
       }
 
@@ -737,11 +805,6 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       await updateServerStorageStats();
     } catch (error) {
       console.error('Error in saveEmailsToServer:', error);
-      toast({
-        title: "Error",
-        description: "Failed to save emails to server storage",
-        variant: "destructive"
-      });
     }
   };
 
@@ -823,108 +886,6 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         description: "Failed to clear server storage",
         variant: "destructive"
       });
-    }
-  };
-
-  // Modified searchEmails function to check all sources
-  const searchEmails = async (searchQuery: string): Promise<Email[]> => {
-    try {
-      // 1. Check local storage
-      const localEmails = loadEmailsFromLocalStorage();
-      const localMatches = localEmails.filter(email => 
-        email.to.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        email.from.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        email.subject.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        email.body.toLowerCase().includes(searchQuery.toLowerCase())
-      );
-
-      // 2. Check Gmail API
-      const { data, error } = await supabase.functions.invoke('search-emails', {
-        body: { 
-          searchEmail: defaultSearchEmail,
-          searchQuery: searchQuery,
-          includeRead: true,
-          includeUnread: true,
-          includeForwarded: true,
-          includeDomainForwarded: true,
-          includeImportant: true,
-          includeGrouped: true,
-          includeUngrouped: true,
-          minutesBack: 30,
-          fetchUnread: true
-        }
-      });
-
-      if (error) throw new Error(error.message);
-      if (data.error) throw new Error(data.error);
-
-      let apiEmails: Email[] = [];
-      if (data.emails && Array.isArray(data.emails)) {
-        apiEmails = data.emails.map((email: any) => ({
-          id: email.id,
-          from: email.from || "Unknown Sender",
-          to: email.to || "Unknown Recipient",
-          subject: email.subject || "No Subject",
-          body: email.body || "No content available",
-          date: email.date || new Date().toISOString(),
-          isRead: email.isRead || false,
-          isHidden: false,
-          matchedIn: email.matchedIn || "unknown",
-          extractedRecipients: email.extractedRecipients || [],
-          rawMatch: email.rawMatch || null,
-          isForwardedEmail: email.isForwardedEmail || false,
-          isCluster: email.isCluster || false,
-          isDomainForwarded: email.isDomainForwarded || false,
-          isImportant: email.isImportant || false,
-          isGrouped: email.isGrouped || false
-        }));
-      }
-
-      // 3. Check server storage
-      const today = new Date().toISOString().split('T')[0];
-      const serverEmails = await loadEmailsFromServer(today);
-      const serverMatches = serverEmails.filter(email => 
-          email.to.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        email.from.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        email.subject.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        email.body.toLowerCase().includes(searchQuery.toLowerCase())
-        );
-
-      // Combine and deduplicate results
-      const allEmails = [...localMatches, ...apiEmails, ...serverMatches];
-      const uniqueEmails = allEmails.reduce((acc: Email[], current: Email) => {
-        const x = acc.find(item => item.id === current.id);
-        if (!x) {
-          return acc.concat([current]);
-        } else {
-          return acc;
-        }
-      }, []);
-
-      // Sort by date, newest first
-      const sortedEmails = uniqueEmails.sort((a, b) => 
-        new Date(b.date).getTime() - new Date(a.date).getTime()
-      );
-
-      // Apply email limit
-      const limitedEmails = emailLimit > 0 
-        ? sortedEmails.slice(0, emailLimit) 
-        : sortedEmails;
-
-      // Save new emails to local storage
-      if (apiEmails.length > 0) {
-        saveEmailsToLocalStorage(apiEmails);
-      }
-
-      return limitedEmails;
-    } catch (error: any) {
-      console.error('Error searching emails:', error);
-      toast({
-        title: "Error",
-        description: error.message || "Failed to search emails",
-        variant: "destructive"
-      });
-      return [];
     }
   };
 
