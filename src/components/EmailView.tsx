@@ -34,14 +34,14 @@ export const EmailView: React.FC<EmailViewProps> = ({
     }
   };
 
-  // Clean the email body: remove <a> tags, Â, and extra spaces
+  // Clean the email body: remove <a> tags, all HTML, Â, and extra spaces
   const cleanBody = (body: string) => {
     if (!body) return '';
     let cleaned = body
       // Remove script/style tags
       .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
       .replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, '')
-      // Remove all <a> tags but keep their text
+      // Remove all <a> tags and their content
       .replace(/<a [^>]*>(.*?)<\/a>/gi, '$1')
       // Remove all other HTML tags
       .replace(/<[^>]*>/g, '')
@@ -115,9 +115,9 @@ export const EmailView: React.FC<EmailViewProps> = ({
               </div>
               {/* Email body */}
               <div className="px-4 md:px-0 pb-6">
-                <div className="prose max-w-none whitespace-pre-wrap text-black text-base">
+                <pre className="whitespace-pre-wrap text-black text-base font-sans bg-white border-0 shadow-none m-0 p-0" style={{fontFamily: 'inherit'}}>
                   {cleanBody(currentEmail.body)}
-                </div>
+                </pre>
               </div>
               {/* Centered action buttons */}
               <div className="flex justify-center space-x-4 border-t pt-4 pb-2">
