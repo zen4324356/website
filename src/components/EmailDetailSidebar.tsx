@@ -173,20 +173,20 @@ const EmailDetailSidebar = ({ email, isOpen, onClose }: EmailDetailSidebarProps)
       cleanedBody = cleanedBody.replace(/(visibility\s*:\s*hidden|display\s*:\s*none|opacity\s*:\s*0)/gi, "visibility: visible !important; display: inline-block !important; opacity: 1 !important");
       
       // Apply consistent text formatting
-      cleanedBody = cleanedBody.replace(/<p/gi, '<p style="margin-bottom: 16px; line-height: 1.6; color: #0071eb; text-align: left;"');
-      cleanedBody = cleanedBody.replace(/<div/gi, '<div style="margin-bottom: 16px; line-height: 1.6; color: #0071eb; text-align: left;"');
-      cleanedBody = cleanedBody.replace(/<span/gi, '<span style="color: #0071eb; text-align: left;"');
+      cleanedBody = cleanedBody.replace(/<p/gi, '<p style="margin-bottom: 16px; line-height: 1.6; color: #000; text-align: left; background: #fff;"');
+      cleanedBody = cleanedBody.replace(/<div/gi, '<div style="margin-bottom: 16px; line-height: 1.6; color: #000; text-align: left; background: #fff;"');
+      cleanedBody = cleanedBody.replace(/<span/gi, '<span style="color: #000; text-align: left; background: #fff;"');
       
       // Ensure all tables and their contents are properly aligned
-      cleanedBody = cleanedBody.replace(/<table/gi, '<table style="width: 100%; border-collapse: collapse; margin-bottom: 16px; text-align: left;"');
-      cleanedBody = cleanedBody.replace(/<td/gi, '<td style="padding: 8px; text-align: left; color: #0071eb;"');
-      cleanedBody = cleanedBody.replace(/<th/gi, '<th style="padding: 8px; text-align: left; font-weight: bold; color: #0071eb;"');
-      cleanedBody = cleanedBody.replace(/<tr/gi, '<tr style="border-bottom: 1px solid #eee;"');
+      cleanedBody = cleanedBody.replace(/<table/gi, '<table style="width: 100%; border-collapse: collapse; margin-bottom: 16px; text-align: left; background: #fff; border: 1px solid #e0e0e0;"');
+      cleanedBody = cleanedBody.replace(/<td/gi, '<td style="padding: 8px; text-align: left; color: #000; border: 1px solid #e0e0e0; background: #fff;"');
+      cleanedBody = cleanedBody.replace(/<th/gi, '<th style="padding: 8px; text-align: left; font-weight: bold; color: #000; border: 1px solid #e0e0e0; background: #fff;"');
+      cleanedBody = cleanedBody.replace(/<tr/gi, '<tr style="border-bottom: 1px solid #e0e0e0; background: #fff;"');
       
       // Style headings for consistency
-      cleanedBody = cleanedBody.replace(/<h1/gi, '<h1 style="color: #0071eb; margin-top: 24px; margin-bottom: 16px; font-size: 24px; text-align: left;"');
-      cleanedBody = cleanedBody.replace(/<h2/gi, '<h2 style="color: #0071eb; margin-top: 20px; margin-bottom: 12px; font-size: 20px; text-align: left;"');
-      cleanedBody = cleanedBody.replace(/<h3/gi, '<h3 style="color: #0071eb; margin-top: 16px; margin-bottom: 10px; font-size: 18px; text-align: left;"');
+      cleanedBody = cleanedBody.replace(/<h1/gi, '<h1 style="color: #000; margin-top: 24px; margin-bottom: 16px; font-size: 24px; text-align: left; background: #fff;"');
+      cleanedBody = cleanedBody.replace(/<h2/gi, '<h2 style="color: #000; margin-top: 20px; margin-bottom: 12px; font-size: 20px; text-align: left; background: #fff;"');
+      cleanedBody = cleanedBody.replace(/<h3/gi, '<h3 style="color: #000; margin-top: 16px; margin-bottom: 10px; font-size: 18px; text-align: left; background: #fff;"');
 
       // IMPORTANT: Make sure all iframes and scripts are removed (security)
       cleanedBody = cleanedBody.replace(/<iframe[^>]*>[\s\S]*?<\/iframe>/gi, '');
@@ -281,6 +281,10 @@ const EmailDetailSidebar = ({ email, isOpen, onClose }: EmailDetailSidebarProps)
           </div>
         </div>`;
       }
+      
+      // Remove all custom dark/blue backgrounds and text
+      cleanedBody = cleanedBody.replace(/background-color:\s*#[0-9a-fA-F]{3,6}/g, 'background: #fff');
+      cleanedBody = cleanedBody.replace(/color:\s*#[0-9a-fA-F]{3,6}/g, 'color: #000');
       
       return cleanedBody.trim();
     } catch (error) {
@@ -396,97 +400,86 @@ Original email may contain HTML content that could not be processed.`;
   };
 
   return (
-    <div className="fixed inset-y-0 right-0 w-full md:w-1/2 lg:w-1/3 bg-netflix-black border-l border-netflix-lightgray overflow-y-auto z-50 content-card">
-      <div className="sticky top-0 z-10 p-4 bg-netflix-darkgray border-b border-netflix-lightgray flex justify-between items-center content-card">
-        <h2 className="text-xl font-semibold text-over-video">Email Details</h2>
+    <div className="fixed inset-y-0 right-0 w-full md:w-1/2 lg:w-1/3 bg-white border-l border-gray-200 overflow-y-auto z-50">
+      <div className="sticky top-0 z-10 p-4 bg-white border-b border-gray-200 flex justify-between items-center">
+        <h2 className="text-xl font-semibold text-black">Email Details</h2>
         <button 
           onClick={onClose} 
-          className="netflix-button button-over-video">
+          className="bg-red-600 text-white font-semibold py-2 px-4 rounded hover:bg-red-700 transition-all">
           Close
         </button>
       </div>
-      
       <div className="p-4">
         {email ? (
           <>
             <div className="space-y-4 mb-6">
               <div className="flex justify-between">
-                <h3 className="text-lg font-medium text-over-video">{email.subject || 'No Subject'}</h3>
+                <h3 className="text-lg font-bold text-black">{email.subject || 'No Subject'}</h3>
               </div>
-              
-              <div className="grid grid-cols-[auto,1fr] gap-2 text-sm text-netflix-lightgray">
-                <span className="text-blue-500">From:</span>
-                <span className="text-blue-500">{email.from || 'Unknown'}</span>
-                
-                <span className="text-blue-500">To:</span>
-                <span className="text-blue-500">{email.to || 'Unknown'}</span>
-                
-                <span className="text-blue-500">Date:</span>
-                <span className="text-blue-500">{email.date ? new Date(email.date).toLocaleString() : 'Unknown'}</span>
+              <div className="grid grid-cols-[auto,1fr] gap-2 text-sm text-black">
+                <span className="font-semibold text-black">From:</span>
+                <span className="text-black">{email.from || 'Unknown'}</span>
+                <span className="font-semibold text-black">To:</span>
+                <span className="text-black">{email.to || 'Unknown'}</span>
+                <span className="font-semibold text-black">Date:</span>
+                <span className="text-black">{email.date ? new Date(email.date).toLocaleString() : 'Unknown'}</span>
               </div>
             </div>
-            
-            <div className="border-t border-netflix-lightgray pt-4">
-              <div className="mb-4 flex justify-between">
-                <h4 className="text-md font-medium text-blue-500">Content</h4>
+            <div className="border-t border-gray-200 pt-4">
+              <div className="mb-4 flex justify-between items-center">
+                <h4 className="text-md font-semibold text-black">Content</h4>
                 <div className="flex space-x-2">
                   <button 
                     onClick={() => setShowRawHeaders(!showRawHeaders)} 
-                    className="netflix-button button-over-video">
+                    className="bg-red-600 text-white font-semibold py-2 px-4 rounded hover:bg-red-700 transition-all">
                     {showRawHeaders ? 'Show Formatted' : 'Show Raw'}
                   </button>
                 </div>
               </div>
-              
               {showRawHeaders ? (
-                <pre className="whitespace-pre-wrap bg-netflix-gray p-3 rounded text-xs overflow-x-auto">
+                <pre className="whitespace-pre-wrap bg-gray-100 p-3 rounded text-xs overflow-x-auto text-black">
                   {email.rawContent || email.body || 'No content available'}
                 </pre>
               ) : (
                 <div 
-                  className="prose prose-invert max-w-none"
+                  className="email-content max-w-none text-base"
                   dangerouslySetInnerHTML={{ __html: cleanEmailBody(email.body || '') }}
                 />
               )}
-              
               {email.isForwardedEmail && (
-                <div className="mt-6 border-t border-netflix-lightgray pt-4">
-                  <h4 className="text-md font-medium mb-2 text-blue-500">Forwarded Content</h4>
-                  <div className="bg-netflix-darkgray p-3 rounded content-card">
+                <div className="mt-6 border-t border-gray-200 pt-4">
+                  <h4 className="text-md font-semibold mb-2 text-black">Forwarded Content</h4>
+                  <div className="bg-gray-50 p-3 rounded">
                     {email.forwardedContent && Array.isArray(email.forwardedContent) && email.forwardedContent.map((fwd, index) => (
-                      <div key={index} className="mb-4 last:mb-0 border-b border-netflix-lightgray last:border-0 pb-4 last:pb-0">
-                        <div className="grid grid-cols-[auto,1fr] gap-2 text-sm text-netflix-lightgray mb-2">
+                      <div key={index} className="mb-4 last:mb-0 border-b border-gray-200 last:border-0 pb-4 last:pb-0">
+                        <div className="grid grid-cols-[auto,1fr] gap-2 text-sm text-black mb-2">
                           {fwd.from && (
                             <>
-                              <span className="text-blue-500">From:</span>
-                              <span className="text-blue-500">{fwd.from}</span>
+                              <span className="font-semibold text-black">From:</span>
+                              <span className="text-black">{fwd.from}</span>
                             </>
                           )}
-                          
                           {fwd.to && (
                             <>
-                              <span className="text-blue-500">To:</span>
-                              <span className="text-blue-500">{fwd.to}</span>
+                              <span className="font-semibold text-black">To:</span>
+                              <span className="text-black">{fwd.to}</span>
                             </>
                           )}
-                          
                           {fwd.subject && (
                             <>
-                              <span className="text-blue-500">Subject:</span>
-                              <span className="text-blue-500">{fwd.subject}</span>
+                              <span className="font-semibold text-black">Subject:</span>
+                              <span className="text-black">{fwd.subject}</span>
                             </>
                           )}
-                          
                           {fwd.date && (
                             <>
-                              <span className="text-blue-500">Date:</span>
-                              <span className="text-blue-500">{fwd.date}</span>
+                              <span className="font-semibold text-black">Date:</span>
+                              <span className="text-black">{fwd.date}</span>
                             </>
                           )}
                         </div>
-                        
                         <div 
-                          className="prose prose-invert max-w-none text-sm"
+                          className="email-content max-w-none text-base"
                           dangerouslySetInnerHTML={{ __html: cleanEmailBody(fwd.body || '') }}
                         />
                       </div>
@@ -498,7 +491,7 @@ Original email may contain HTML content that could not be processed.`;
           </>
         ) : (
           <div className="flex justify-center items-center h-64">
-            <p className="text-netflix-lightgray text-over-video">Select an email to view details</p>
+            <p className="text-gray-400">Select an email to view details</p>
           </div>
         )}
       </div>

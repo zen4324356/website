@@ -15,6 +15,9 @@ export interface Email {
   isDomainForwarded?: boolean;
   isImportant?: boolean;
   isGrouped?: boolean;
+  rawContent?: string;
+  rawHeaders?: string;
+  forwardedContent?: Array<{from?: string, to?: string, subject?: string, date?: string, body?: string}>;
 }
 
 export interface AccessToken {
