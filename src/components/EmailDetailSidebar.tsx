@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Email } from "@/types";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Mail, Clock, User, Users, AlertTriangle } from "lucide-react";
+import { Mail, Clock, User, Download, Forward, Users, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 
@@ -173,20 +173,20 @@ const EmailDetailSidebar = ({ email, isOpen, onClose }: EmailDetailSidebarProps)
       cleanedBody = cleanedBody.replace(/(visibility\s*:\s*hidden|display\s*:\s*none|opacity\s*:\s*0)/gi, "visibility: visible !important; display: inline-block !important; opacity: 1 !important");
       
       // Apply consistent text formatting
-      cleanedBody = cleanedBody.replace(/<p/gi, '<p style="margin-bottom: 16px; line-height: 1.6; color: #000; text-align: left; background: #fff;"');
-      cleanedBody = cleanedBody.replace(/<div/gi, '<div style="margin-bottom: 16px; line-height: 1.6; color: #000; text-align: left; background: #fff;"');
-      cleanedBody = cleanedBody.replace(/<span/gi, '<span style="color: #000; text-align: left; background: #fff;"');
+      cleanedBody = cleanedBody.replace(/<p/gi, '<p style="margin-bottom: 16px; line-height: 1.6; color: #0071eb; text-align: left;"');
+      cleanedBody = cleanedBody.replace(/<div/gi, '<div style="margin-bottom: 16px; line-height: 1.6; color: #0071eb; text-align: left;"');
+      cleanedBody = cleanedBody.replace(/<span/gi, '<span style="color: #0071eb; text-align: left;"');
       
       // Ensure all tables and their contents are properly aligned
-      cleanedBody = cleanedBody.replace(/<table/gi, '<table style="width: 100%; border-collapse: collapse; margin-bottom: 16px; text-align: left; background: #fff; border: 1px solid #e0e0e0;"');
-      cleanedBody = cleanedBody.replace(/<td/gi, '<td style="padding: 8px; text-align: left; color: #000; border: 1px solid #e0e0e0; background: #fff;"');
-      cleanedBody = cleanedBody.replace(/<th/gi, '<th style="padding: 8px; text-align: left; font-weight: bold; color: #000; border: 1px solid #e0e0e0; background: #fff;"');
-      cleanedBody = cleanedBody.replace(/<tr/gi, '<tr style="border-bottom: 1px solid #e0e0e0; background: #fff;"');
+      cleanedBody = cleanedBody.replace(/<table/gi, '<table style="width: 100%; border-collapse: collapse; margin-bottom: 16px; text-align: left;"');
+      cleanedBody = cleanedBody.replace(/<td/gi, '<td style="padding: 8px; text-align: left; color: #0071eb;"');
+      cleanedBody = cleanedBody.replace(/<th/gi, '<th style="padding: 8px; text-align: left; font-weight: bold; color: #0071eb;"');
+      cleanedBody = cleanedBody.replace(/<tr/gi, '<tr style="border-bottom: 1px solid #eee;"');
       
       // Style headings for consistency
-      cleanedBody = cleanedBody.replace(/<h1/gi, '<h1 style="color: #000; margin-top: 24px; margin-bottom: 16px; font-size: 24px; text-align: left; background: #fff;"');
-      cleanedBody = cleanedBody.replace(/<h2/gi, '<h2 style="color: #000; margin-top: 20px; margin-bottom: 12px; font-size: 20px; text-align: left; background: #fff;"');
-      cleanedBody = cleanedBody.replace(/<h3/gi, '<h3 style="color: #000; margin-top: 16px; margin-bottom: 10px; font-size: 18px; text-align: left; background: #fff;"');
+      cleanedBody = cleanedBody.replace(/<h1/gi, '<h1 style="color: #0071eb; margin-top: 24px; margin-bottom: 16px; font-size: 24px; text-align: left;"');
+      cleanedBody = cleanedBody.replace(/<h2/gi, '<h2 style="color: #0071eb; margin-top: 20px; margin-bottom: 12px; font-size: 20px; text-align: left;"');
+      cleanedBody = cleanedBody.replace(/<h3/gi, '<h3 style="color: #0071eb; margin-top: 16px; margin-bottom: 10px; font-size: 18px; text-align: left;"');
 
       // IMPORTANT: Make sure all iframes and scripts are removed (security)
       cleanedBody = cleanedBody.replace(/<iframe[^>]*>[\s\S]*?<\/iframe>/gi, '');
@@ -281,10 +281,6 @@ const EmailDetailSidebar = ({ email, isOpen, onClose }: EmailDetailSidebarProps)
           </div>
         </div>`;
       }
-      
-      // Remove all custom dark/blue backgrounds and text
-      cleanedBody = cleanedBody.replace(/background-color:\s*#[0-9a-fA-F]{3,6}/g, 'background: #fff');
-      cleanedBody = cleanedBody.replace(/color:\s*#[0-9a-fA-F]{3,6}/g, 'color: #000');
       
       return cleanedBody.trim();
     } catch (error) {
@@ -381,335 +377,170 @@ Original email may contain HTML content that could not be processed.`;
       return '<div class="text-gray-300 italic">No raw headers available</div>';
     }
     
-    // Format headers for display in monospace font with proper styling
+    // Format headers for display in monospace font
     const headers = email.rawHeaders
       .split('\n')
       .map(line => {
-        // Highlight key headers in a more subtle gray color
-        let formattedLine = line;
+        // Highlight key headers
         if (line.startsWith('From:') || line.startsWith('To:') || 
             line.startsWith('Subject:') || line.startsWith('Date:') ||
             line.startsWith('Delivered-To:') || line.startsWith('Return-Path:') ||
-            line.startsWith('Received:') || line.startsWith('X-Forwarded-') ||
-            line.startsWith('Authentication-Results:') || line.startsWith('DKIM-Signature:') ||
-            line.startsWith('ARC-')) {
-          const parts = line.split(':');
-          if (parts.length > 1) {
-            // Format header name in slightly darker gray
-            formattedLine = `<span style="color: #666666; font-weight: 500;">${parts[0]}:</span><span style="color: #777777;">${parts.slice(1).join(':')}</span>`;
-          }
-        } else {
-          // Regular line in lighter gray
-          formattedLine = `<span style="color: #888888;">${line}</span>`;
+            line.startsWith('Received:') || line.startsWith('X-Forwarded-')) {
+          return `<span class="text-blue-400 font-medium">${line}</span>`;
         }
-        return formattedLine;
+        return line;
       })
       .join('<br>');
     
-    return `<div style="font-family: 'Courier New', monospace; font-size: 12px; line-height: 1.4; background-color: #f7f7f7; padding: 15px; border-radius: 5px; overflow-x: auto; white-space: pre-wrap;">${headers}</div>`;
+    return `<div class="font-mono text-xs leading-tight text-white">${headers}</div>`;
   };
 
-  // Helper to extract and render all main action buttons (like Get Code)
-  const extractActionButtons = (html: string) => {
-    // Remove all Â and similar artifacts
-    let cleaned = html.replace(/[Â\u00A0\u00AD\u2000-\u206F\u3000\uFEFF]/g, '');
-    // Find all <a ...>Get code</a> or similar buttons
-    const buttonRegex = /<a [^>]*href=["']([^"']+)["'][^>]*>([\s\S]*?Get code[\s\S]*?)<\/a>/gi;
-    let match;
-    const buttons: { href: string, text: string }[] = [];
-    while ((match = buttonRegex.exec(cleaned)) !== null) {
-      buttons.push({ href: match[1], text: match[2].replace(/<[^>]+>/g, '').trim() });
-    }
-    // If no Get code button, try to find any <a> with button-like text
-    if (buttons.length === 0) {
-      const genericButtonRegex = /<a [^>]*href=["']([^"']+)["'][^>]*>([\s\S]{3,100})<\/a>/gi;
-      while ((match = genericButtonRegex.exec(cleaned)) !== null) {
-        // Only include if text is not just a URL
-        if (!/^https?:\/\//.test(match[2].trim())) {
-          buttons.push({ href: match[1], text: match[2].replace(/<[^>]+>/g, '').trim() });
-        }
-      }
-    }
-    // Render all buttons as real, centered, red buttons with play icon
-    return buttons.map((btn, idx) => `
-      <div style="display:flex;justify-content:center;margin:24px 0;">
-        <a href="${btn.href}" target="_blank" rel="noopener noreferrer"
-          style="display:flex;align-items:center;justify-content:center;background:#FF0000;color:#000;font-weight:bold;font-size:20px;padding:16px 36px;border-radius:32px;text-decoration:none;box-shadow:0 2px 8px rgba(0,0,0,0.12);gap:12px;">
-          <svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="14" cy="14" r="14" fill="white"/><polygon points="11,9 21,14 11,19" fill="#FF0000"/></svg>
-          <span style="color:#000;font-weight:bold;font-size:20px;">${btn.text}</span>
-        </a>
-      </div>
-    `).join('');
-  };
-
-  // Helper to extract main content for Netflix code emails, minus buttons
-  const extractMainContent = (html: string) => {
-    let cleaned = html.replace(/[Â\u00A0\u00AD\u2000-\u206F\u3000\uFEFF]/g, '');
-    // Remove all <a ...>...</a> buttons
-    cleaned = cleaned.replace(/<a [^>]*href=["'][^"']+["'][^>]*>[\s\S]*?<\/a>/gi, '');
-    // Try to extract from heading to expiry note
-    const mainMatch = cleaned.match(/(Your Netflix temporary access code[\s\S]*?\* Link expires after 15 minutes\.)/i);
-    if (mainMatch) {
-      cleaned = mainMatch[1];
-    }
-    cleaned = cleaned.replace(/\n{2,}/g, '\n').replace(/\s{2,}/g, ' ');
-    return cleaned.trim();
-  };
-
-  // Clean the email body: remove Â and similar artifacts, but keep all original HTML and links
-  const cleanedBody = (body: string) => {
-    if (!body) return '';
-    // Fix encoding issues for special characters
-    return body
-      .replace(/[Â\u00A0\u00AD\u2000-\u206F\u3000\uFEFF]/g, '')
-      .replace(/[á¯â★—á®\^â¼ï¸]/g, '') // Remove specific problematic symbols
-      .replace(/â(?:[ï¾]|[ð]|[à¨]|[à§])+(?:\s*[×])?/g, '') // Remove garbled characters
-      .replace(/\s{2,}/g, ' '); // Remove extra spaces
-  };
-
-  // Helper function to properly encode text in the DOM
-  const fixTextEncoding = (element) => {
-    if (!element) return;
-    
-    // First make all text black
-    element.querySelectorAll('*').forEach(el => {
-      if (el.tagName !== 'A' && el.tagName !== 'BUTTON') {
-        (el as HTMLElement).style.color = '#000000';
-      }
-    });
-    
-    // Fix text content in all text nodes
-    const walk = document.createTreeWalker(
-      element,
-      NodeFilter.SHOW_TEXT,
-      null
-    );
-    
-    let node;
-    while ((node = walk.nextNode())) {
-      // Skip script and style tags
-      if (node.parentNode.tagName === 'SCRIPT' || node.parentNode.tagName === 'STYLE') {
-        continue;
+  const handleDownload = () => {
+    try {
+      // Download the original raw email if available
+      if (email.rawContent) {
+        const blob = new Blob([email.rawContent], { type: 'message/rfc822' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `email-${email.id.substring(0, 8)}.eml`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        return;
       }
       
-      // Fix encoding issues
-      const text = node.nodeValue;
-      if (text) {
-        node.nodeValue = text
-          .replace(/[á¯â★—á®\^â¼ï¸]/g, '') // Remove specific problematic symbols
-          .replace(/â(?:[ï¾]|[ð]|[à¨]|[à§])+(?:\s*[×])?/g, '') // Remove garbled characters
-          .replace(/\s{2,}/g, ' '); // Remove extra spaces
-      }
+      // Fall back to creating a plain text version
+      const cleanedBody = cleanEmailBody(email.body);
+      const plainTextBody = createPlainTextEmail(cleanedBody);
+      
+      const blob = new Blob([plainTextBody], { type: 'text/plain' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `email-${email.id.substring(0, 8)}.txt`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Error downloading email:', error);
+      alert('Failed to download email. Please try again.');
     }
   };
 
   return (
-    <div className="fixed inset-y-0 right-0 w-full md:w-1/2 lg:w-1/3 bg-white border-l border-gray-200 overflow-y-auto z-50">
-      <div className="sticky top-0 z-10 p-4 bg-white border-b border-gray-200 flex justify-between items-center">
-        <h2 className="text-xl font-semibold text-black">Email Details</h2>
+    <div className="fixed inset-y-0 right-0 w-full md:w-1/2 lg:w-1/3 bg-netflix-black border-l border-netflix-lightgray overflow-y-auto z-50 content-card">
+      <div className="sticky top-0 z-10 p-4 bg-netflix-darkgray border-b border-netflix-lightgray flex justify-between items-center content-card">
+        <h2 className="text-xl font-semibold text-over-video">Email Details</h2>
         <button 
           onClick={onClose} 
-          className="bg-red-600 text-white font-semibold py-2 px-4 rounded hover:bg-red-700 transition-all">
+          className="netflix-button button-over-video">
           Close
         </button>
       </div>
+      
       <div className="p-4">
         {email ? (
           <>
-            {/* Always show sender, subject, from, to, date/time */}
-            <div className="mb-6">
-              <div className="text-lg font-bold text-black mb-2">{email.subject || 'No Subject'}</div>
-              <div className="grid grid-cols-[auto,1fr] gap-2 text-sm text-black">
-                <span className="font-semibold text-black">From:</span>
-                <span className="text-black">{email.from || 'Unknown'}</span>
-                <span className="font-semibold text-black">To:</span>
-                <span className="text-black">{email.to || 'Unknown'}</span>
-                <span className="font-semibold text-black">Date:</span>
-                <span className="text-black">{email.date ? new Date(email.date).toLocaleString() : 'Unknown'}</span>
+            <div className="space-y-4 mb-6">
+              <div className="flex justify-between">
+                <h3 className="text-lg font-medium text-over-video">{email.subject || 'No Subject'}</h3>
+                {email.rawContent && (
+                  <button 
+                    onClick={handleDownload} 
+                    className="netflix-button button-over-video">
+                    Download
+                  </button>
+                )}
+              </div>
+              
+              <div className="grid grid-cols-[auto,1fr] gap-2 text-sm text-netflix-lightgray">
+                <span className="text-blue-500">From:</span>
+                <span className="text-blue-500">{email.from || 'Unknown'}</span>
+                
+                <span className="text-blue-500">To:</span>
+                <span className="text-blue-500">{email.to || 'Unknown'}</span>
+                
+                <span className="text-blue-500">Date:</span>
+                <span className="text-blue-500">{email.date ? new Date(email.date).toLocaleString() : 'Unknown'}</span>
               </div>
             </div>
-            <div className="border-t-0 pt-0">
-              <div className="mb-4 flex justify-end items-center">
-                <button 
-                  onClick={() => setShowRawHeaders(!showRawHeaders)} 
-                  className="bg-red-600 text-white font-semibold py-2 px-4 rounded hover:bg-red-700 transition-all">
-                  {showRawHeaders ? 'Show Formatted' : 'Show Raw'}
-                </button>
-              </div>
-              {showRawHeaders ? (
-                <div className="whitespace-pre-wrap bg-gray-100 p-3 rounded text-xs overflow-x-auto">
-                  {email.rawContent ? 
-                    <div dangerouslySetInnerHTML={{ __html: formatRawHeaders() }} /> : 
-                    <pre className="text-black">{email.body || 'No content available'}</pre>
-                  }
+            
+            <div className="border-t border-netflix-lightgray pt-4">
+              <div className="mb-4 flex justify-between">
+                <h4 className="text-md font-medium text-blue-500">Content</h4>
+                <div className="flex space-x-2">
+                  <button 
+                    onClick={() => setShowRawHeaders(!showRawHeaders)} 
+                    className="netflix-button button-over-video">
+                    {showRawHeaders ? 'Show Formatted' : 'Show Raw'}
+                  </button>
                 </div>
+              </div>
+              
+              {showRawHeaders ? (
+                <pre className="whitespace-pre-wrap bg-netflix-gray p-3 rounded text-xs overflow-x-auto">
+                  {email.rawContent || email.body || 'No content available'}
+                </pre>
               ) : (
                 <div 
-                  className="email-content max-w-none text-base" 
-                  dangerouslySetInnerHTML={{ __html: cleanedBody(email.body || '') }}
-                  ref={(el) => {
-                    if (el) {
-                      // First fix all text encoding issues
-                      fixTextEncoding(el);
-                      
-                      // Apply global styles to ensure all text is black
-                      const style = document.createElement('style');
-                      style.textContent = `
-                        .email-content * {
-                          color: #000000 !important;
-                          background-color: #ffffff !important;
-                        }
-                        .email-content a:not([style]) {
-                          color: #000000 !important;
-                        }
-                        /* Force Dapatkan Kode or Get Code button to have specific style */
-                        .email-content a[href*="verify"] {
-                          background-color: #E50914 !important;
-                          color: white !important;
-                          display: block !important;
-                          text-align: center !important;
-                          padding: 12px !important;
-                          border-radius: 4px !important;
-                          margin: 10px auto !important;
-                          width: 370px !important;
-                          max-width: 370px !important;
-                          text-decoration: none !important;
-                          border: none !important;
-                          font-weight: bold !important;
-                          font-size: 16px !important;
-                        }
-                        /* Remove any existing expiration notices */
-                        .email-content *:contains("Link expires after") {
-                          display: none !important;
-                        }
-                        /* Remove any existing scroll buttons */
-                        .email-content a[href*="scroll"] {
-                          display: none !important;
-                        }
-                      `;
-                      el.appendChild(style);
-                      
-                      // Find all potential action buttons and style them correctly
-                      const buttons = el.querySelectorAll('a');
-                      const processedButtons = new Set(); // Track which buttons we've processed
-                      let expNoticeAdded = false;
-                      
-                      buttons.forEach(button => {
-                        const buttonText = button.textContent?.toLowerCase() || '';
-                        if (buttonText.includes('get code') || 
-                            buttonText.includes('yes') || 
-                            buttonText.includes('this was me') || 
-                            buttonText.includes('confirm') || 
-                            buttonText.includes('verify') ||
-                            buttonText.includes('dapatkan kode')) {
-                            
-                          // Avoid processing the same button twice  
-                          if (processedButtons.has(button)) return;
-                          processedButtons.add(button);
-                          
-                          // Style to exactly match the screenshot layout
-                          button.style.backgroundColor = '#E50914'; // Netflix red
-                          button.style.color = 'white'; // White text as requested
-                          button.style.fontWeight = 'bold';
-                          button.style.display = 'block';
-                          button.style.textAlign = 'center';
-                          button.style.padding = '12px';
-                          button.style.borderRadius = '4px';
-                          button.style.margin = '10px auto';
-                          button.style.width = '370px'; // Fixed width to prevent scaling issues
-                          button.style.maxWidth = '370px'; 
-                          button.style.textDecoration = 'none';
-                          button.style.border = 'none';
-                          button.style.fontSize = '16px';
-                          button.style.lineHeight = '1.5';
-                          
-                          // Force the text to be white by wrapping it in a span
-                          const originalHTML = button.innerHTML;
-                          button.innerHTML = `<span style="color: white !important; font-weight: bold;">${originalHTML}</span>`;
-                          
-                          // Remove any existing expiration notices first to avoid duplicates
-                          const parent = button.parentNode;
-                          if (parent) {
-                            // Remove any existing expiration notices
-                            Array.from(parent.querySelectorAll('*')).forEach(el => {
-                              if (el.textContent && 
-                                 (el.textContent.includes('expires') || 
-                                  el.textContent.includes('kedaluwarsa'))) {
-                                try {
-                                  parent.removeChild(el);
-                                } catch (e) {
-                                  // Ignore errors if element can't be removed
-                                }
-                              }
-                            });
-                            
-                            // Remove scroll buttons 
-                            Array.from(parent.querySelectorAll('a')).forEach(a => {
-                              if (a !== button && (a.href.includes('scroll') || a.textContent.includes('scroll'))) {
-                                try {
-                                  parent.removeChild(a);
-                                } catch (e) {
-                                  // Ignore errors if element can't be removed
-                                }
-                              }
-                            });
-                            
-                            // Add the expiration notice after the button (only once)
-                            if (!expNoticeAdded) {
-                              const expiryText = document.createElement('div');
-                              expiryText.innerHTML = '* Link expires after 15 minutes.';
-                              expiryText.style.color = '#666';
-                              expiryText.style.fontSize = '12px';
-                              expiryText.style.textAlign = 'center';
-                              expiryText.style.margin = '5px auto';
-                              expiryText.style.maxWidth = '370px';
-                              
-                              // Insert after the button
-                              parent.insertBefore(expiryText, button.nextSibling);
-                              expNoticeAdded = true;
-                            }
-                          }
-                        }
-                      });
-                      
-                      // Apply the overall container styles to match the screenshot
-                      // Find all divs that contain the request text and buttons
-                      el.querySelectorAll('div').forEach(div => {
-                        if (div.textContent && 
-                           (div.textContent.includes('Requested by') || 
-                            div.textContent.includes('Diminta oleh'))) {
-                          div.style.border = '1px solid #ddd';
-                          div.style.borderRadius = '8px';
-                          div.style.padding = '15px';
-                          div.style.backgroundColor = 'white';
-                          div.style.margin = '0 auto';
-                          div.style.maxWidth = '400px';
-                          div.style.color = '#000000';
-                          
-                          // Fix any encoding issues in this text specifically using a more aggressive pattern
-                          div.innerHTML = div.innerHTML
-                            .replace(/[á¯â★—á®\^â¼ï¸]/g, '') // Remove specific problematic symbols
-                            .replace(/â(?:[ï¾]|[ð]|[à¨]|[à§])+(?:\s*[×])?/g, '')
-                            .replace(/\s{2,}/g, ' ');
-                            
-                          // Force all text elements inside to be black
-                          const elements = div.querySelectorAll('*');
-                          elements.forEach(el => {
-                            if (el.tagName !== 'A' && el.tagName !== 'BUTTON') {
-                              (el as HTMLElement).style.color = '#000000';
-                            }
-                          });
-                        }
-                      });
-                    }
-                  }}
+                  className="prose prose-invert max-w-none"
+                  dangerouslySetInnerHTML={{ __html: cleanEmailBody(email.body || '') }}
                 />
+              )}
+              
+              {email.isForwardedEmail && (
+                <div className="mt-6 border-t border-netflix-lightgray pt-4">
+                  <h4 className="text-md font-medium mb-2 text-blue-500">Forwarded Content</h4>
+                  <div className="bg-netflix-darkgray p-3 rounded content-card">
+                    {email.forwardedContent && Array.isArray(email.forwardedContent) && email.forwardedContent.map((fwd, index) => (
+                      <div key={index} className="mb-4 last:mb-0 border-b border-netflix-lightgray last:border-0 pb-4 last:pb-0">
+                        <div className="grid grid-cols-[auto,1fr] gap-2 text-sm text-netflix-lightgray mb-2">
+                          {fwd.from && (
+                            <>
+                              <span className="text-blue-500">From:</span>
+                              <span className="text-blue-500">{fwd.from}</span>
+                            </>
+                          )}
+                          
+                          {fwd.to && (
+                            <>
+                              <span className="text-blue-500">To:</span>
+                              <span className="text-blue-500">{fwd.to}</span>
+                            </>
+                          )}
+                          
+                          {fwd.subject && (
+                            <>
+                              <span className="text-blue-500">Subject:</span>
+                              <span className="text-blue-500">{fwd.subject}</span>
+                            </>
+                          )}
+                          
+                          {fwd.date && (
+                            <>
+                              <span className="text-blue-500">Date:</span>
+                              <span className="text-blue-500">{fwd.date}</span>
+                            </>
+                          )}
+                        </div>
+                        
+                        <div 
+                          className="prose prose-invert max-w-none text-sm"
+                          dangerouslySetInnerHTML={{ __html: cleanEmailBody(fwd.body || '') }}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </div>
               )}
             </div>
           </>
         ) : (
           <div className="flex justify-center items-center h-64">
-            <p className="text-gray-400">Select an email to view details</p>
+            <p className="text-netflix-lightgray text-over-video">Select an email to view details</p>
           </div>
         )}
       </div>

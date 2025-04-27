@@ -3,10 +3,9 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import { useData } from "@/context/DataContext";
 import { GoogleAuthConfig, User } from "@/types";
-import { LogIn, Plus, User as UserIcon, Trash, X, Edit, ExternalLink, AlertCircle, Mail, Check, Lock, Unlock, RefreshCw } from "lucide-react";
+import { LogIn, Plus, User as UserIcon, Trash, X, Edit, ExternalLink, AlertCircle, Mail, Check, Lock, Unlock } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/components/ui/use-toast";
-import { Button } from "@/components/ui/button";
 
 const AdminDashboard = () => {
   const { admin, logout } = useAuth();
@@ -27,10 +26,7 @@ const AdminDashboard = () => {
     autoRefreshInterval,
     autoRefreshEnabled,
     updateAutoRefreshInterval,
-    toggleAutoRefresh,
-    serverStorageStats,
-    clearServerStorage,
-    getServerStorageStats
+    toggleAutoRefresh
   } = useData();
   const navigate = useNavigate();
 
@@ -774,71 +770,6 @@ const AdminDashboard = () => {
                     Current default: {defaultSearchEmail}
                   </div>
                 </form>
-              </div>
-
-              <div className="border-t border-netflix-gray pt-6">
-                <h3 className="text-lg font-medium mb-4">Server Storage Settings</h3>
-                <p className="text-gray-400 mb-4">
-                  Manage emails stored on the server. The system automatically saves new emails every 3 seconds.
-                </p>
-                
-                <div className="space-y-6">
-                  <div className="flex items-center gap-4">
-                    <div className="flex-1">
-                      <div className="grid grid-cols-2 gap-4">
-                        <div className="bg-netflix-black/50 p-4 rounded-lg">
-                          <p className="text-sm text-gray-400">Total Stored Emails</p>
-                          <p className="text-xl font-semibold text-netflix-white">
-                            {serverStorageStats.totalEmails}
-                          </p>
-                        </div>
-                        <div className="bg-netflix-black/50 p-4 rounded-lg">
-                          <p className="text-sm text-gray-400">Storage Size</p>
-                          <p className="text-xl font-semibold text-netflix-white">
-                            {serverStorageStats.storageSize}
-                          </p>
-                        </div>
-                      </div>
-                      <div className="mt-4">
-                        <p className="text-sm text-gray-400">Last Updated</p>
-                        <p className="text-netflix-white">
-                          {serverStorageStats.lastUpdated 
-                            ? new Date(serverStorageStats.lastUpdated).toLocaleString() 
-                            : 'Never'}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-4">
-                    <Button
-                      onClick={clearServerStorage}
-                      variant="destructive"
-                      className="flex items-center gap-2"
-                    >
-                      <Trash className="h-4 w-4" />
-                      Clear Server Storage
-                    </Button>
-                    <Button
-                      onClick={getServerStorageStats}
-                      variant="outline"
-                      className="flex items-center gap-2"
-                    >
-                      <RefreshCw className="h-4 w-4" />
-                      Refresh Stats
-                    </Button>
-                  </div>
-
-                  <div className="text-sm text-gray-400">
-                    <p className="mb-2">Server Storage Information:</p>
-                    <ul className="list-disc pl-5 space-y-1">
-                      <li>Emails are automatically saved every 3 seconds</li>
-                      <li>Emails from the same domain are automatically replaced</li>
-                      <li>Storage is organized by date and domain</li>
-                      <li>Clearing storage will remove all saved emails</li>
-                    </ul>
-                  </div>
-                </div>
               </div>
             </div>
           </div>

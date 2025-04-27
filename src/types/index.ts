@@ -1,7 +1,7 @@
 export interface User {
   id: string;
-  email: string;
-  created_at: string;
+  accessToken: string;
+  isBlocked: boolean;
 }
 
 export interface Admin {
@@ -11,18 +11,14 @@ export interface Admin {
 
 export interface GoogleAuthConfig {
   id: string;
-  client_id: string;
-  client_secret: string;
-  project_id: string | null;
-  auth_uri: string;
-  token_uri: string;
-  auth_provider_cert_url: string;
-  is_active: boolean;
-  access_token: string | null;
-  refresh_token: string | null;
-  token_expiry: string | null;
-  created_at: string;
-  updated_at: string;
+  clientId: string;
+  clientSecret: string;
+  projectId: string;
+  authUri: string;
+  tokenUri: string;
+  authProviderCertUrl: string;
+  isActive: boolean;
+  access_token?: string;
 }
 
 export interface Email {
@@ -34,17 +30,32 @@ export interface Email {
   date: string;
   isRead: boolean;
   isHidden: boolean;
-  matchedIn: string;
-  extractedRecipients: string[];
-  rawMatch: string | null;
-  isForwardedEmail: boolean;
-  isCluster: boolean;
-  isDomainForwarded: boolean;
-  isImportant: boolean;
-  isGrouped: boolean;
-  source?: 'gmail_api' | 'server_database' | 'local_storage';
-  sourceTag?: string;
-  lastUpdated?: string;
+  matchedIn?: string;
+  extractedRecipients?: string[];
+  rawMatch?: string;
+  isForwardedEmail?: boolean;
+  isCluster?: boolean;
+  isLargeCluster?: boolean;
+  recipientCount?: number;
+  rawContent?: string | null;
+  rawHeaders?: string | null;
+  forwardedData?: {
+    fromEmail: string | null;
+    fromName: string | null;
+    date: string | null;
+    subject: string | null;
+    forwardedCount?: number;
+    nestedLevel?: number;
+    isNetflixRelated?: boolean;
+    importantSections?: string[];
+  } | null;
+  forwardedContent?: Array<{
+    from?: string;
+    to?: string;
+    subject?: string;
+    date?: string;
+    body?: string;
+  }>;
 }
 
 export interface AuthContextType {
@@ -58,74 +69,24 @@ export interface AuthContextType {
 }
 
 export interface DataContextType {
-  accessTokens: AccessToken[];
+  accessTokens: User[];
   googleConfigs: GoogleAuthConfig[];
   emails: Email[];
   emailLimit: number;
-  fetchEmails: (searchQuery: string) => Promise<Email[]>;
-  addAccessToken: (token: AccessToken) => void;
+  fetchEmails: (emailId: string) => Promise<Email[]>;
+  addAccessToken: (token: string) => void;
   deleteAccessToken: (id: string) => void;
-  blockAccessToken: (id: string) => void;
+  blockAccessToken: (id: string, blocked: boolean) => void;
   addGoogleConfig: (config: Omit<GoogleAuthConfig, "id" | "isActive">) => void;
   updateGoogleConfig: (id: string, config: Partial<GoogleAuthConfig>) => void;
   deleteGoogleConfig: (id: string) => void;
   toggleEmailVisibility: (id: string) => void;
-  updateAdminCredentials: (credentials: AdminCredentials) => void;
+  updateAdminCredentials: (username: string, password: string) => Promise<void>;
   updateEmailLimit: (limit: number) => void;
   defaultSearchEmail: string;
-  updateDefaultSearchEmail: (email: string) => void;
+  updateDefaultSearchEmail: (email: string) => Promise<void>;
   autoRefreshInterval: number;
   autoRefreshEnabled: boolean;
   updateAutoRefreshInterval: (interval: number) => void;
-  toggleAutoRefresh: () => void;
-  clearEmailsFromLocalStorage: () => void;
-  saveEmailsToLocalStorage: (emails: Email[]) => void;
-  loadEmailsFromLocalStorage: () => Email[];
-  clearServerStorage: () => void;
-  serverStorageStats: {
-    totalEmails: number;
-    lastUpdated: string;
-    storageSize: string;
-  };
-  getServerStorageStats: () => Promise<void>;
-}
-
-export interface AdminSettings {
-  id: string;
-  email_limit: number;
-  auto_refresh_enabled: boolean;
-  auto_refresh_interval: number;
-  default_search_email: string | null;
-  created_at: string;
-  updated_at: string;
-}
-
-export interface ServerStorageStats {
-  id: string;
-  total_emails: number;
-  storage_size: string;
-  last_updated: string | null;
-  created_at: string;
-  updated_at: string;
-}
-
-export interface ServerEmail {
-  id: string;
-  domain: string;
-  email_data: Email;
-  created_at: string;
-  updated_at: string;
-}
-
-export interface AccessToken {
-  id: string;
-  access_token: string;
-  is_blocked: boolean;
-  created_at: string;
-  updated_at: string;
-}
-
-export interface AdminCredentials {
-  username: string;
-  password: string;
+  toggleAutoRefresh: (enabled: boolean) => void;
 }
