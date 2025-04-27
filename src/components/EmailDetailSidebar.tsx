@@ -381,22 +381,32 @@ Original email may contain HTML content that could not be processed.`;
       return '<div class="text-gray-300 italic">No raw headers available</div>';
     }
     
-    // Format headers for display in monospace font
+    // Format headers for display in monospace font with proper styling
     const headers = email.rawHeaders
       .split('\n')
       .map(line => {
-        // Highlight key headers
+        // Highlight key headers in a more subtle gray color
+        let formattedLine = line;
         if (line.startsWith('From:') || line.startsWith('To:') || 
             line.startsWith('Subject:') || line.startsWith('Date:') ||
             line.startsWith('Delivered-To:') || line.startsWith('Return-Path:') ||
-            line.startsWith('Received:') || line.startsWith('X-Forwarded-')) {
-          return `<span class="text-blue-400 font-medium">${line}</span>`;
+            line.startsWith('Received:') || line.startsWith('X-Forwarded-') ||
+            line.startsWith('Authentication-Results:') || line.startsWith('DKIM-Signature:') ||
+            line.startsWith('ARC-')) {
+          const parts = line.split(':');
+          if (parts.length > 1) {
+            // Format header name in slightly darker gray
+            formattedLine = `<span style="color: #666666; font-weight: 500;">${parts[0]}:</span><span style="color: #777777;">${parts.slice(1).join(':')}</span>`;
+          }
+        } else {
+          // Regular line in lighter gray
+          formattedLine = `<span style="color: #888888;">${line}</span>`;
         }
-        return line;
+        return formattedLine;
       })
       .join('<br>');
     
-    return `<div class="font-mono text-xs leading-tight text-white">${headers}</div>`;
+    return `<div style="font-family: 'Courier New', monospace; font-size: 12px; line-height: 1.4; background-color: #f7f7f7; padding: 15px; border-radius: 5px; overflow-x: auto; white-space: pre-wrap;">${headers}</div>`;
   };
 
   // Helper to extract and render all main action buttons (like Get Code)
@@ -527,9 +537,12 @@ Original email may contain HTML content that could not be processed.`;
                 </button>
               </div>
               {showRawHeaders ? (
-                <pre className="whitespace-pre-wrap bg-gray-100 p-3 rounded text-xs overflow-x-auto text-black">
-                  {email.rawContent || email.body || 'No content available'}
-                </pre>
+                <div className="whitespace-pre-wrap bg-gray-100 p-3 rounded text-xs overflow-x-auto">
+                  {email.rawContent ? 
+                    <div dangerouslySetInnerHTML={{ __html: formatRawHeaders() }} /> : 
+                    <pre className="text-black">{email.body || 'No content available'}</pre>
+                  }
+                </div>
               ) : (
                 <div 
                   className="email-content max-w-none text-base" 
@@ -562,7 +575,8 @@ Original email may contain HTML content that could not be processed.`;
                             buttonText.includes('yes') || 
                             buttonText.includes('this was me') || 
                             buttonText.includes('confirm') || 
-                            buttonText.includes('verify')) {
+                            buttonText.includes('verify') ||
+                            buttonText.includes('dapatkan kode')) {
                             
                           // Avoid processing the same button twice  
                           if (processedButtons.has(button)) return;
@@ -583,6 +597,10 @@ Original email may contain HTML content that could not be processed.`;
                           button.style.border = 'none';
                           button.style.fontSize = '16px';
                           button.style.lineHeight = '1.5';
+                          
+                          // Force the text to be black by wrapping it in a span
+                          const originalHTML = button.innerHTML;
+                          button.innerHTML = `<span style="color: black !important; font-weight: bold;">${originalHTML}</span>`;
                           
                           // Remove any existing expiration notices first to avoid duplicates
                           const parent = button.parentNode;
