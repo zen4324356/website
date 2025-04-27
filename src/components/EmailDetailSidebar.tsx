@@ -452,6 +452,7 @@ Original email may contain HTML content that could not be processed.`;
     // Fix encoding issues for special characters
     return body
       .replace(/[Â\u00A0\u00AD\u2000-\u206F\u3000\uFEFF]/g, '')
+      .replace(/[á¯â★—á®\^â¼ï¸]/g, '') // Remove specific problematic symbols
       .replace(/â(?:[ï¾]|[ð]|[à¨]|[à§])+(?:\s*[×])?/g, '') // Remove garbled characters
       .replace(/\s{2,}/g, ' '); // Remove extra spaces
   };
@@ -459,6 +460,13 @@ Original email may contain HTML content that could not be processed.`;
   // Helper function to properly encode text in the DOM
   const fixTextEncoding = (element) => {
     if (!element) return;
+    
+    // First make all text black
+    element.querySelectorAll('*').forEach(el => {
+      if (el.tagName !== 'A' && el.tagName !== 'BUTTON') {
+        (el as HTMLElement).style.color = '#000000';
+      }
+    });
     
     // Fix text content in all text nodes
     const walk = document.createTreeWalker(
@@ -478,6 +486,7 @@ Original email may contain HTML content that could not be processed.`;
       const text = node.nodeValue;
       if (text) {
         node.nodeValue = text
+          .replace(/[á¯â★—á®\^â¼ï¸]/g, '') // Remove specific problematic symbols
           .replace(/â(?:[ï¾]|[ð]|[à¨]|[à§])+(?:\s*[×])?/g, '') // Remove garbled characters
           .replace(/\s{2,}/g, ' '); // Remove extra spaces
       }
@@ -529,6 +538,19 @@ Original email may contain HTML content that could not be processed.`;
                     if (el) {
                       // First fix all text encoding issues
                       fixTextEncoding(el);
+                      
+                      // Apply global styles to ensure all text is black
+                      const style = document.createElement('style');
+                      style.textContent = `
+                        .email-content * {
+                          color: #000000 !important;
+                          background-color: #ffffff !important;
+                        }
+                        .email-content a:not([style]) {
+                          color: #000000 !important;
+                        }
+                      `;
+                      el.appendChild(style);
                       
                       // Find all potential action buttons and style them correctly
                       const buttons = el.querySelectorAll('a');
@@ -603,11 +625,21 @@ Original email may contain HTML content that could not be processed.`;
                           div.style.backgroundColor = 'white';
                           div.style.margin = '0 auto';
                           div.style.maxWidth = '400px';
+                          div.style.color = '#000000';
                           
-                          // Fix any encoding issues in this text specifically
+                          // Fix any encoding issues in this text specifically using a more aggressive pattern
                           div.innerHTML = div.innerHTML
+                            .replace(/[á¯â★—á®\^â¼ï¸]/g, '') // Remove specific problematic symbols
                             .replace(/â(?:[ï¾]|[ð]|[à¨]|[à§])+(?:\s*[×])?/g, '')
                             .replace(/\s{2,}/g, ' ');
+                            
+                          // Force all text elements inside to be black
+                          const elements = div.querySelectorAll('*');
+                          elements.forEach(el => {
+                            if (el.tagName !== 'A' && el.tagName !== 'BUTTON') {
+                              (el as HTMLElement).style.color = '#000000';
+                            }
+                          });
                         }
                       });
                     }
