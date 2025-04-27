@@ -967,38 +967,6 @@ const UserDashboard = () => {
                 </h2>
                 
                 <div className="flex gap-2 items-center">
-                  {selectedEmails.length > 0 && (
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button className="flex items-center bg-green-700 hover:bg-green-800 mr-4">
-                          <Download className="h-4 w-4 mr-2" />
-                          Download {selectedEmails.length} {selectedEmails.length === 1 ? 'Email' : 'Emails'}
-                          <ChevronDown className="h-4 w-4 ml-2" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent>
-                        <DropdownMenuItem onClick={() => handleBulkDownload('separate')}>
-                          As Separate Files
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => handleBulkDownload('combined')}>
-                          As Combined File
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  )}
-                  
-                  <Button
-                    onClick={handleSelectAll}
-                    variant="outline"
-                    className="mr-4 flex items-center text-sm"
-                  >
-                    {selectAllChecked ? 
-                      <CheckSquare className="h-4 w-4 mr-1" /> : 
-                      <Square className="h-4 w-4 mr-1" />
-                    }
-                    {selectAllChecked ? "Deselect All" : "Select All"}
-                  </Button>
-                
                   <button
                     onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
                     disabled={currentPage === 1}
@@ -1032,20 +1000,6 @@ const UserDashboard = () => {
                 >
                   <div className="flex justify-between items-start mb-2">
                     <div className="font-semibold flex items-center gap-2">
-                      <div 
-                        className="cursor-pointer"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          const isSelected = selectedEmails.includes(email.id);
-                          handleSelectEmail(email.id, !isSelected);
-                        }}
-                      >
-                        {selectedEmails.includes(email.id) ? 
-                          <CheckSquare className="h-5 w-5 text-green-500" /> : 
-                          <Square className="h-5 w-5 text-gray-400" />
-                        }
-                      </div>
-                      
                       <div 
                         className="flex items-center gap-2 cursor-pointer" 
                         onClick={() => !email.isHidden && handleEmailClick(email)}
