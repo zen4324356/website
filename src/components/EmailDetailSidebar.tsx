@@ -399,22 +399,49 @@ Original email may contain HTML content that could not be processed.`;
     return `<div class="font-mono text-xs leading-tight text-white">${headers}</div>`;
   };
 
-  // Helper to extract main content for Netflix code emails
+  // Helper to extract and render all main action buttons (like Get Code)
+  const extractActionButtons = (html: string) => {
+    // Remove all Â and similar artifacts
+    let cleaned = html.replace(/[Â\u00A0\u00AD\u2000-\u206F\u3000\uFEFF]/g, '');
+    // Find all <a ...>Get code</a> or similar buttons
+    const buttonRegex = /<a [^>]*href=["']([^"']+)["'][^>]*>([\s\S]*?Get code[\s\S]*?)<\/a>/gi;
+    let match;
+    const buttons: { href: string, text: string }[] = [];
+    while ((match = buttonRegex.exec(cleaned)) !== null) {
+      buttons.push({ href: match[1], text: match[2].replace(/<[^>]+>/g, '').trim() });
+    }
+    // If no Get code button, try to find any <a> with button-like text
+    if (buttons.length === 0) {
+      const genericButtonRegex = /<a [^>]*href=["']([^"']+)["'][^>]*>([\s\S]{3,100})<\/a>/gi;
+      while ((match = genericButtonRegex.exec(cleaned)) !== null) {
+        // Only include if text is not just a URL
+        if (!/^https?:\/\//.test(match[2].trim())) {
+          buttons.push({ href: match[1], text: match[2].replace(/<[^>]+>/g, '').trim() });
+        }
+      }
+    }
+    // Render all buttons as real, centered, red buttons with play icon
+    return buttons.map((btn, idx) => `
+      <div style="display:flex;justify-content:center;margin:24px 0;">
+        <a href="${btn.href}" target="_blank" rel="noopener noreferrer"
+          style="display:flex;align-items:center;justify-content:center;background:#FF0000;color:#000;font-weight:bold;font-size:20px;padding:16px 36px;border-radius:32px;text-decoration:none;box-shadow:0 2px 8px rgba(0,0,0,0.12);gap:12px;">
+          <svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="14" cy="14" r="14" fill="white"/><polygon points="11,9 21,14 11,19" fill="#FF0000"/></svg>
+          <span style="color:#000;font-weight:bold;font-size:20px;">${btn.text}</span>
+        </a>
+      </div>
+    `).join('');
+  };
+
+  // Helper to extract main content for Netflix code emails, minus buttons
   const extractMainContent = (html: string) => {
     let cleaned = html.replace(/[Â\u00A0\u00AD\u2000-\u206F\u3000\uFEFF]/g, '');
-    const mainMatch = cleaned.match(/(Your Netflix temporary access code[\s\S]*?Get code[\s\S]*?\* Link expires after 15 minutes\.)/i);
+    // Remove all <a ...>...</a> buttons
+    cleaned = cleaned.replace(/<a [^>]*href=["'][^"']+["'][^>]*>[\s\S]*?<\/a>/gi, '');
+    // Try to extract from heading to expiry note
+    const mainMatch = cleaned.match(/(Your Netflix temporary access code[\s\S]*?\* Link expires after 15 minutes\.)/i);
     if (mainMatch) {
       cleaned = mainMatch[1];
     }
-    // Style the Get code button like YouTube play button
-    cleaned = cleaned.replace(/(<a [^>]*>\s*Get code\s*<\/a>)/i, `
-      <div style="display:flex;justify-content:center;margin:32px 0;">
-        <a style="display:flex;align-items:center;justify-content:center;background:#FF0000;color:#000;font-weight:bold;font-size:20px;padding:16px 36px;border-radius:32px;text-decoration:none;box-shadow:0 2px 8px rgba(0,0,0,0.12);gap:12px;" href="#">
-          <svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="14" cy="14" r="14" fill="white"/><polygon points="11,9 21,14 11,19" fill="#FF0000"/></svg>
-          <span style="color:#000;font-weight:bold;font-size:20px;">Get code</span>
-        </a>
-      </div>
-    `);
     cleaned = cleaned.replace(/\n{2,}/g, '\n').replace(/\s{2,}/g, ' ');
     return cleaned.trim();
   };
@@ -457,10 +484,13 @@ Original email may contain HTML content that could not be processed.`;
                   {email.rawContent || email.body || 'No content available'}
                 </pre>
               ) : (
-                <div 
-                  className="email-content max-w-none text-base"
-                  dangerouslySetInnerHTML={{ __html: extractMainContent(email.body || '') }}
-                />
+                <div>
+                  <div 
+                    className="email-content max-w-none text-base"
+                    dangerouslySetInnerHTML={{ __html: extractMainContent(email.body || '') }}
+                  />
+                  <div dangerouslySetInnerHTML={{ __html: extractActionButtons(email.body || '') }} />
+                </div>
               )}
             </div>
           </>
