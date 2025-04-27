@@ -495,20 +495,57 @@ Original email may contain HTML content that could not be processed.`;
                   dangerouslySetInnerHTML={{ __html: cleanedBody(email.body || '') }}
                   ref={(el) => {
                     if (el) {
-                      // Find all potential "Get code" buttons and force them to be red with white text
+                      // Find all potential action buttons and style them to match the exact layout from the screenshot
                       const buttons = el.querySelectorAll('a');
                       buttons.forEach(button => {
-                        if (button.textContent && button.textContent.toLowerCase().includes('get code')) {
-                          button.style.backgroundColor = '#E50914';
+                        const buttonText = button.textContent?.toLowerCase() || '';
+                        if (buttonText.includes('get code') || 
+                            buttonText.includes('yes') || 
+                            buttonText.includes('this was me') || 
+                            buttonText.includes('confirm') || 
+                            buttonText.includes('verify')) {
+                          // Style to exactly match the screenshot layout
+                          button.style.backgroundColor = '#E50914'; // Netflix red
                           button.style.color = 'white';
                           button.style.fontWeight = 'bold';
                           button.style.display = 'block';
                           button.style.textAlign = 'center';
-                          button.style.padding = '12px 24px';
+                          button.style.padding = '12px';
                           button.style.borderRadius = '4px';
                           button.style.margin = '10px auto';
+                          button.style.width = '100%';
                           button.style.maxWidth = '400px';
                           button.style.textDecoration = 'none';
+                          button.style.border = 'none';
+                          button.style.fontSize = '16px';
+                          button.style.lineHeight = '1.5';
+                          
+                          // Add the expiration notice after the button
+                          const expiryText = document.createElement('div');
+                          expiryText.innerHTML = '* Link expires after 15 minutes.';
+                          expiryText.style.color = '#666';
+                          expiryText.style.fontSize = '12px';
+                          expiryText.style.textAlign = 'center';
+                          expiryText.style.margin = '5px auto';
+                          expiryText.style.maxWidth = '400px';
+                          
+                          // Insert after the button
+                          if (button.parentNode) {
+                            button.parentNode.insertBefore(expiryText, button.nextSibling);
+                          }
+                        }
+                      });
+                      
+                      // Apply the overall container styles to match the screenshot
+                      // Find all divs that contain the request text and buttons
+                      el.querySelectorAll('div').forEach(div => {
+                        if (div.textContent && div.textContent.includes('Requested by')) {
+                          div.style.border = '1px solid #ddd';
+                          div.style.borderRadius = '8px';
+                          div.style.padding = '15px';
+                          div.style.backgroundColor = 'white';
+                          div.style.margin = '0 auto';
+                          div.style.maxWidth = '500px';
                         }
                       });
                     }
