@@ -14,7 +14,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Check if user is already logged in
   useEffect(() => {
     const storedUser = localStorage.getItem("user");
-    const storedAdmin = localStorage.getItem("adminCredentials");
     
     if (storedUser) {
       try {
@@ -25,18 +24,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       } catch (err) {
         console.error("Error parsing stored user:", err);
         localStorage.removeItem("user");
-      }
-    }
-    
-    if (storedAdmin) {
-      try {
-        const adminData = JSON.parse(storedAdmin);
-        setAdmin(adminData);
-        // Don't automatically log in admin on page refresh
-        // They should actively log in each time
-      } catch (err) {
-        console.error("Error parsing stored admin:", err);
-        localStorage.removeItem("adminCredentials");
       }
     }
   }, []);
@@ -125,24 +112,58 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       console.log("Admin login attempt with:", { username });
       
-      // Try to get admin credentials from local storage
-      const storedAdminJSON = localStorage.getItem("adminCredentials");
+      if (!username || !password) {
+        console.error("Username and password are required");
+        toast({
+          title: "Login Failed",
+          description: "Username and password are required",
+          variant: "destructive"
+        });
+        return false;
+      }
       
-      if (!storedAdminJSON) {
-        console.log("No admin credentials in localStorage, setting defaults");
-        // Default admin credentials
-        const defaultCredentials = { 
-          username: "Admin@Akshay", 
-          password: "Admin@Akshay" 
-        };
+      // Try to get admin credentials from the database
+      const { data: adminData, error: adminError } = await supabase
+        .from('admin_credentials')
+        .select('*')
+        .eq('username', username)
+        .eq('is_active', true)
+        .single();
+      
+      if (adminError || !adminData) {
+        console.error("Error fetching admin credentials:", adminError);
         
-        // Set default admin credentials if none exist
-        localStorage.setItem("adminCredentials", JSON.stringify(defaultCredentials));
+        // Check if we should use default credentials (for first-time setup)
+        const { count, error: countError } = await supabase
+          .from('admin_credentials')
+          .select('*', { count: 'exact', head: true });
         
-        // Check if the provided credentials match default credentials
-        if (username === defaultCredentials.username && password === defaultCredentials.password) {
-          console.log("Default credentials matched");
-          setAdmin(defaultCredentials);
+        if ((countError || count === 0) && username === "Admin@Akshay" && password === "Admin@Akshay") {
+          // No admin credentials in database, use default
+          console.log("No admin credentials in database, using defaults");
+          
+          // Insert default admin credentials
+          const { error: insertError } = await supabase
+            .from('admin_credentials')
+            .insert({
+              username: "Admin@Akshay",
+              password: "Admin@Akshay",
+              is_active: true
+            });
+          
+          if (insertError) {
+            console.error("Error creating admin credentials:", insertError);
+            toast({
+              title: "Login Failed",
+              description: "Failed to create admin account",
+              variant: "destructive"
+            });
+            return false;
+          }
+          
+          // Set admin state
+          const adminCredentials = { username: "Admin@Akshay", password: "Admin@Akshay" };
+          setAdmin(adminCredentials);
           setIsAuthenticated(true);
           setIsAdmin(true);
           
@@ -152,105 +173,46 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           });
           
           return true;
-        } else {
-          console.error("Invalid admin credentials");
-          toast({
-            title: "Login Failed",
-            description: "Invalid admin username or password.",
-            variant: "destructive"
-          });
-          return false;
-        }
-      }
-      
-      // If admin credentials exist in localStorage
-      try {
-        const adminCredentials = JSON.parse(storedAdminJSON);
-        console.log("Retrieved admin credentials from localStorage");
-        
-        if (!adminCredentials || !adminCredentials.username || !adminCredentials.password) {
-          console.warn("Invalid admin credentials format in localStorage, using defaults");
-          const defaultCredentials = { 
-            username: "Admin@Akshay", 
-            password: "Admin@Akshay" 
-          };
-          localStorage.setItem("adminCredentials", JSON.stringify(defaultCredentials));
-          
-          // Check against default credentials
-          if (username === defaultCredentials.username && password === defaultCredentials.password) {
-            console.log("Default credentials matched");
-            setAdmin(defaultCredentials);
-            setIsAuthenticated(true);
-            setIsAdmin(true);
-            
-            toast({
-              title: "Login Successful",
-              description: "You have successfully logged in as an administrator.",
-            });
-            
-            return true;
-          }
-        } else {
-          console.log("Checking provided credentials against stored credentials");
-          
-          // Check credentials - comparing both username and password
-          if (username === adminCredentials.username && password === adminCredentials.password) {
-            console.log("Custom credentials matched");
-            // Store admin state
-            setAdmin(adminCredentials);
-            setIsAuthenticated(true);
-            setIsAdmin(true);
-            
-            toast({
-              title: "Login Successful",
-              description: "You have successfully logged in as an administrator.",
-            });
-            
-            return true;
-          }
         }
         
-        // If we get here, credentials don't match
-        console.error("Invalid admin credentials");
         toast({
           title: "Login Failed",
           description: "Invalid admin username or password.",
           variant: "destructive"
         });
         return false;
-        
-      } catch (err) {
-        console.error("Error parsing admin credentials:", err);
-        // If there's an error parsing, use the default
-        const defaultCredentials = { 
-          username: "Admin@Akshay", 
-          password: "Admin@Akshay" 
-        };
-        localStorage.setItem("adminCredentials", JSON.stringify(defaultCredentials));
-        
-        // Check against default credentials
-        if (username === defaultCredentials.username && password === defaultCredentials.password) {
-          console.log("Default credentials matched");
-          setAdmin(defaultCredentials);
-          setIsAuthenticated(true);
-          setIsAdmin(true);
-          
-          toast({
-            title: "Login Successful",
-            description: "You have successfully logged in as an administrator.",
-          });
-          
-          return true;
-        } else {
-          console.error("Invalid admin credentials");
-          toast({
-            title: "Login Failed",
-            description: "Invalid admin username or password.",
-            variant: "destructive"
-          });
-          return false;
-        }
       }
+      
+      // Check if password matches
+      if (adminData.password === password) {
+        console.log("Admin credentials matched");
+        
+        // Set admin state
+        const adminCredentials = { 
+          username: adminData.username,
+          password: adminData.password
+        };
+        
+        setAdmin(adminCredentials);
+        setIsAuthenticated(true);
+        setIsAdmin(true);
+        
+        toast({
+          title: "Login Successful",
+          description: "You have successfully logged in as an administrator.",
+        });
+        
+        return true;
+      }
+      
+      // Password doesn't match
+      console.error("Invalid admin password");
+      toast({
+        title: "Login Failed",
+        description: "Invalid admin username or password.",
+        variant: "destructive"
+      });
+      return false;
     } catch (error: any) {
       console.error("Admin login error:", error);
       toast({
@@ -266,7 +228,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const logout = () => {
     // Clear stored data
     if (isAdmin) {
-      // Don't remove admin credentials when logging out - just clear the session
+      // Don't need to do anything with admin credentials in the database
       setAdmin(null);
     } else {
       localStorage.removeItem("user");

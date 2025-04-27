@@ -39,6 +39,33 @@ export type Database = {
         }
         Relationships: []
       }
+      admin_credentials: {
+        Row: {
+          id: string
+          username: string
+          password: string
+          created_at: string
+          updated_at: string
+          is_active: boolean
+        }
+        Insert: {
+          id?: string
+          username: string
+          password: string
+          created_at?: string
+          updated_at?: string
+          is_active?: boolean
+        }
+        Update: {
+          id?: string
+          username?: string
+          password?: string
+          created_at?: string
+          updated_at?: string
+          is_active?: boolean
+        }
+        Relationships: []
+      }
       emails: {
         Row: {
           date: string | null
