@@ -83,13 +83,13 @@ export const EmailView: React.FC<EmailViewProps> = ({
             initial={{ opacity: 0, y: 30 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.1, duration: 0.4, ease: 'easeOut' }}
-            className="flex-1 flex flex-col items-center justify-center py-8 px-2 bg-white"
+            className="flex-1 flex flex-col items-center justify-center py-8 px-4 bg-white"
           >
-            <div className="w-full max-w-2xl bg-white rounded-xl shadow-md p-0 md:p-8 border border-gray-200">
+            <div className="w-full max-w-2xl bg-white rounded-xl p-4 md:p-8">
               {/* Sender and subject */}
-              <div className="flex flex-col md:flex-row md:items-center md:justify-between border-b pb-4 px-4 md:px-0">
+              <div className="flex flex-col md:flex-row md:items-center md:justify-between border-b pb-4">
                 <div className="flex items-center space-x-4">
-                  <div className="w-12 h-12 rounded-full bg-red-600 flex items-center justify-center text-white text-2xl font-bold">
+                  <div className="w-12 h-12 rounded-full bg-gray-200 flex items-center justify-center text-gray-700 text-2xl font-bold">
                     {avatarLetter}
                   </div>
                   <div>
@@ -110,12 +110,12 @@ export const EmailView: React.FC<EmailViewProps> = ({
                 </div>
               </div>
               {/* Subject */}
-              <div className="px-4 md:px-0 pt-6 pb-2">
+              <div className="py-4">
                 <h1 className="text-2xl font-bold text-black">{currentEmail.subject}</h1>
               </div>
               {/* Email body */}
-              <div className="px-4 md:px-0 pb-6">
-                <pre className="whitespace-pre-wrap text-black text-base font-sans bg-white border-0 shadow-none m-0 p-0" style={{fontFamily: 'inherit'}}>
+              <div className="pb-6">
+                <pre className="whitespace-pre-wrap text-black text-base font-sans bg-white" style={{fontFamily: 'inherit'}}>
                   {cleanBody(currentEmail.body)}
                 </pre>
               </div>
