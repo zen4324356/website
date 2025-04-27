@@ -446,6 +446,12 @@ Original email may contain HTML content that could not be processed.`;
     return cleaned.trim();
   };
 
+  // Clean the email body: remove Â and similar artifacts, but keep all original HTML and links
+  const cleanedBody = (body: string) => {
+    if (!body) return '';
+    return body.replace(/[Â\u00A0\u00AD\u2000-\u206F\u3000\uFEFF]/g, '');
+  };
+
   return (
     <div className="fixed inset-y-0 right-0 w-full md:w-1/2 lg:w-1/3 bg-white border-l border-gray-200 overflow-y-auto z-50">
       <div className="sticky top-0 z-10 p-4 bg-white border-b border-gray-200 flex justify-between items-center">
@@ -484,13 +490,10 @@ Original email may contain HTML content that could not be processed.`;
                   {email.rawContent || email.body || 'No content available'}
                 </pre>
               ) : (
-                <div>
-                  <div 
-                    className="email-content max-w-none text-base"
-                    dangerouslySetInnerHTML={{ __html: extractMainContent(email.body || '') }}
-                  />
-                  <div dangerouslySetInnerHTML={{ __html: extractActionButtons(email.body || '') }} />
-                </div>
+                <div 
+                  className="email-content max-w-none text-base"
+                  dangerouslySetInnerHTML={{ __html: cleanedBody(email.body || '') }}
+                />
               )}
             </div>
           </>
