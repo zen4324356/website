@@ -429,6 +429,18 @@ Original email may contain HTML content that could not be processed.`;
       <div className="p-4">
         {email ? (
           <>
+            {/* Always show sender, subject, from, to, date/time */}
+            <div className="mb-6">
+              <div className="text-lg font-bold text-black mb-2">{email.subject || 'No Subject'}</div>
+              <div className="grid grid-cols-[auto,1fr] gap-2 text-sm text-black">
+                <span className="font-semibold text-black">From:</span>
+                <span className="text-black">{email.from || 'Unknown'}</span>
+                <span className="font-semibold text-black">To:</span>
+                <span className="text-black">{email.to || 'Unknown'}</span>
+                <span className="font-semibold text-black">Date:</span>
+                <span className="text-black">{email.date ? new Date(email.date).toLocaleString() : 'Unknown'}</span>
+              </div>
+            </div>
             <div className="border-t-0 pt-0">
               <div className="mb-4 flex justify-end items-center">
                 <button 
