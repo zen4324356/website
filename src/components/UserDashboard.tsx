@@ -72,20 +72,6 @@ const UserDashboard = () => {
     };
   }, [user, navigate]);
 
-  useEffect(() => {
-    let mounted = true;
-    
-    if (user && mounted) {
-      toast({
-        title: "Welcome to Unknown Household Access",
-        description: "You have successfully logged in to your dashboard.",
-        className: "fixed top-4 left-4 z-50"
-      });
-    }
-    
-    return () => { mounted = false; };
-  }, []);
-
   // Set up auto-refresh functionality
   useEffect(() => {
     let intervalId: number | null = null;
@@ -607,12 +593,6 @@ const UserDashboard = () => {
       return;
     }
     
-    // Show searching feedback to the user
-    toast({
-      title: "Searching...",
-      description: "Searching through all email sources...",
-    });
-    
     try {
       // Use fetchEmails from DataContext to search all sources
       const filteredEmails = await fetchEmails(filterValue);
@@ -626,34 +606,15 @@ const UserDashboard = () => {
       setSearchResults(sortedResults);
       setCurrentPage(1);
       
-      // Show a more informative message about what was matched
-      const resultDescription = sortedResults.length === 0 
-        ? `No matches found for "${filterValue}"`
-        : `Found ${sortedResults.length} matches for "${filterValue}"`;
-      
-      const sourceCounts = {
-        gmail: sortedResults.filter(e => e.source === 'gmail_api').length,
-        database: sortedResults.filter(e => e.source === 'server_database').length,
-        local: sortedResults.filter(e => e.source === 'local_storage').length
-      };
-      
-      const sourceInfo = [
-        sourceCounts.gmail > 0 ? `${sourceCounts.gmail} from Gmail API` : null,
-        sourceCounts.database > 0 ? `${sourceCounts.database} from Server Database` : null,
-        sourceCounts.local > 0 ? `${sourceCounts.local} from Local Storage` : null
-      ].filter(Boolean).join(', ');
-      
-      toast({
-        title: "Search Complete",
-        description: `${resultDescription} (${sourceInfo})`,
-      });
+      // Show a toast ONLY if results are found
+      if (sortedResults.length > 0) {
+        toast({
+          title: "Emails Found",
+          description: `Found ${sortedResults.length} matches for "${filterValue}"`,
+        });
+      }
     } catch (error) {
       console.error('Error during search:', error);
-      toast({
-        title: "Search Error",
-        description: "Failed to search emails. Please try again.",
-        variant: "destructive"
-      });
     }
   };
 
@@ -812,26 +773,6 @@ const UserDashboard = () => {
                         <span className="text-sm font-medium text-gray-500">
                           {email.subject}
                         </span>
-                        {/* Source Tag */}
-                        {email.sourceTag && (
-                          <span className={`text-xs px-2 py-0.5 rounded-full ${
-                            email.source === 'gmail_api' ? 'bg-green-100 text-green-800' :
-                            email.source === 'server_database' ? 'bg-yellow-100 text-yellow-800' :
-                            'bg-gray-100 text-gray-800'
-                          }`}>
-                            {email.sourceTag}
-                          </span>
-                        )}
-                        {/* Text Tag */}
-                        {email.matchedIn && (
-                          <span className="text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full">
-                            {email.matchedIn === 'forwarded' ? 'Forwarded Content' :
-                             email.matchedIn === 'subject' ? 'Subject Match' :
-                             email.matchedIn === 'body' ? 'Body Match' :
-                             email.matchedIn === 'recipient' ? 'Recipient Match' :
-                             'Matched'}
-                          </span>
-                        )}
                       </div>
                       
                       {email.isForwardedEmail && (

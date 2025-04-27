@@ -401,17 +401,20 @@ Original email may contain HTML content that could not be processed.`;
 
   // Helper to extract main content for Netflix code emails
   const extractMainContent = (html: string) => {
-    // Remove all Â and similar artifacts
     let cleaned = html.replace(/[Â\u00A0\u00AD\u2000-\u206F\u3000\uFEFF]/g, '');
-    // Try to extract from heading to Get code button and expiry note
-    // This is a simple heuristic for Netflix code emails
     const mainMatch = cleaned.match(/(Your Netflix temporary access code[\s\S]*?Get code[\s\S]*?\* Link expires after 15 minutes\.)/i);
     if (mainMatch) {
       cleaned = mainMatch[1];
     }
-    // Center the Get code button
-    cleaned = cleaned.replace(/(<a [^>]*>\s*Get code\s*<\/a>)/i, '<div style="display:flex;justify-content:center;margin:24px 0;">$1</div>');
-    // Remove extra empty lines and spaces
+    // Style the Get code button like YouTube play button
+    cleaned = cleaned.replace(/(<a [^>]*>\s*Get code\s*<\/a>)/i, `
+      <div style="display:flex;justify-content:center;margin:32px 0;">
+        <a style="display:flex;align-items:center;justify-content:center;background:#FF0000;color:#000;font-weight:bold;font-size:20px;padding:16px 36px;border-radius:32px;text-decoration:none;box-shadow:0 2px 8px rgba(0,0,0,0.12);gap:12px;" href="#">
+          <svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="14" cy="14" r="14" fill="white"/><polygon points="11,9 21,14 11,19" fill="#FF0000"/></svg>
+          <span style="color:#000;font-weight:bold;font-size:20px;">Get code</span>
+        </a>
+      </div>
+    `);
     cleaned = cleaned.replace(/\n{2,}/g, '\n').replace(/\s{2,}/g, ' ');
     return cleaned.trim();
   };

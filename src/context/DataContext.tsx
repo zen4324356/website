@@ -2,7 +2,6 @@ import React, { createContext, useContext, useState, useEffect } from "react";
 import { DataContextType, User, GoogleAuthConfig, Email, Admin, AccessToken, GoogleConfig, AdminCredentials } from "@/types";
 import { v4 as uuidv4 } from "@/utils/uuid";
 import { supabase } from "@/integrations/supabase/client";
-import { toast } from "@/components/ui/use-toast";
 
 const DataContext = createContext<DataContextType | undefined>(undefined);
 
@@ -194,17 +193,8 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (error) throw error;
 
       setAutoRefreshInterval(interval);
-    toast({
-        title: "Success",
-        description: "Auto-refresh interval updated",
-      });
     } catch (error) {
       console.error('Error updating auto-refresh interval:', error);
-      toast({
-        title: "Error",
-        description: "Failed to update auto-refresh interval",
-        variant: "destructive"
-    });
     }
   };
 
@@ -220,17 +210,8 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (error) throw error;
 
     setAutoRefreshEnabled(enabled);
-    toast({
-        title: "Success",
-        description: `Auto-refresh ${enabled ? 'enabled' : 'disabled'}`,
-      });
     } catch (error) {
       console.error('Error toggling auto-refresh:', error);
-      toast({
-        title: "Error",
-        description: "Failed to toggle auto-refresh",
-        variant: "destructive"
-    });
     }
   };
 
@@ -277,17 +258,8 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (error) throw error;
 
       setEmailLimit(limit);
-    toast({
-        title: "Success",
-        description: "Email limit updated",
-      });
     } catch (error) {
       console.error('Error updating email limit:', error);
-      toast({
-        title: "Error",
-        description: "Failed to update email limit",
-        variant: "destructive"
-    });
     }
   };
 
@@ -311,17 +283,8 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (error) throw error;
 
     setDefaultSearchEmail(email);
-    toast({
-        title: "Success",
-        description: "Default search email updated",
-      });
     } catch (error) {
       console.error('Error updating default search email:', error);
-      toast({
-        title: "Error",
-        description: "Failed to update default search email",
-        variant: "destructive"
-    });
     }
   };
 
@@ -420,10 +383,6 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         };
         
         setAccessTokens(prev => [...prev, formattedToken]);
-        toast({
-          title: "Success",
-          description: "Access token added successfully",
-        });
       }
       
       // Refresh the tokens list to ensure we have the latest data
@@ -431,11 +390,6 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       
     } catch (error: any) {
       console.error('Error adding access token:', error);
-      toast({
-        title: "Error",
-        description: error.message || "Failed to add access token",
-        variant: "destructive"
-      });
     }
   };
 
@@ -450,17 +404,8 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (data.error) throw new Error(data.error);
       
       setAccessTokens(prev => prev.filter(token => token.id !== id));
-      toast({
-        title: "Success",
-        description: "Access token deleted successfully",
-      });
     } catch (error: any) {
       console.error('Error deleting access token:', error);
-      toast({
-        title: "Error",
-        description: error.message || "Failed to delete access token",
-        variant: "destructive"
-      });
     }
   };
 
@@ -479,21 +424,12 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
           token.id === id ? { ...token, isBlocked: blocked } : token
         )
       );
-      toast({
-        title: "Success",
-        description: `Access token ${blocked ? 'blocked' : 'unblocked'} successfully`,
-      });
       
       // Refresh the tokens list to ensure we have the latest data
       await fetchAccessTokens();
       
     } catch (error: any) {
       console.error('Error blocking access token:', error);
-      toast({
-        title: "Error",
-        description: error.message || `Failed to ${blocked ? 'block' : 'unblock'} access token`,
-        variant: "destructive"
-      });
     }
   };
 
@@ -516,17 +452,8 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // Refresh Google configs to ensure we have the latest data
       await fetchGoogleConfigs();
       
-      toast({
-        title: "Success",
-        description: "Google authentication configuration added successfully",
-      });
     } catch (error: any) {
       console.error('Error adding Google config:', error);
-      toast({
-        title: "Error",
-        description: error.message || "Failed to add Google authentication configuration",
-        variant: "destructive"
-      });
     }
   };
 
@@ -553,17 +480,8 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // Refresh Google configs to ensure we have the latest data
       await fetchGoogleConfigs();
       
-      toast({
-        title: "Success",
-        description: "Google authentication configuration updated successfully",
-      });
     } catch (error: any) {
       console.error('Error updating Google config:', error);
-      toast({
-        title: "Error",
-        description: error.message || "Failed to update Google authentication configuration",
-        variant: "destructive"
-      });
     }
   };
 
@@ -580,21 +498,12 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (data && data.error) throw new Error(data.error);
       
       setGoogleConfigs(prev => prev.filter(config => config.id !== id));
-      toast({
-        title: "Success",
-        description: "Google authentication configuration deleted successfully",
-      });
       
       // Refresh Google configs to ensure we have the latest data
       await fetchGoogleConfigs();
       
     } catch (error: any) {
       console.error('Error deleting Google config:', error);
-      toast({
-        title: "Error",
-        description: error.message || "Failed to delete Google authentication configuration",
-        variant: "destructive"
-      });
     }
   };
 
@@ -919,17 +828,8 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // Update stats
       await updateServerStorageStats();
 
-      toast({
-        title: "Success",
-        description: "Server storage has been cleared",
-      });
     } catch (error) {
       console.error('Error clearing server storage:', error);
-      toast({
-        title: "Error",
-        description: "Failed to clear server storage",
-        variant: "destructive"
-      });
     }
   };
 
@@ -959,11 +859,6 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         
     } catch (error: any) {
       console.error('Error toggling email visibility:', error);
-      toast({
-        title: "Error",
-        description: error.message || "Failed to update email visibility",
-        variant: "destructive"
-      });
     }
   };
 
@@ -973,11 +868,6 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       try {
         // Validate input
         if (!username.trim() || !password.trim()) {
-          toast({
-            title: "Error",
-            description: "Username and password cannot be empty",
-            variant: "destructive"
-          });
           reject(new Error("Username and password cannot be empty"));
           return;
         }
@@ -987,11 +877,6 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         // Update admin credentials in localStorage
         const updatedAdmin: Admin = { username, password };
         localStorage.setItem("adminCredentials", JSON.stringify(updatedAdmin));
-        
-        toast({
-          title: "Success",
-          description: "Admin credentials updated successfully. Please log in with your new credentials.",
-        });
         
         resolve();
       } catch (error: any) {
@@ -1050,12 +935,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         
         // Store last update timestamp
         localStorage.setItem('emailsLastUpdated', new Date().toISOString());
-        
-        toast({
-          title: "Emails Updated",
-          description: `Updated ${newEmails.length} emails in local storage. Total stored: ${storedCount}`,
-        });
-          }
+      }
         } catch (error) {
       console.error('Error saving emails:', error);
         }
@@ -1105,19 +985,8 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       
       emailKeys.forEach(key => localStorage.removeItem(key));
       setEmails([]);
-      
-      toast({
-        title: "Storage Cleared",
-        description: "All stored emails have been cleared. This action cannot be undone.",
-        variant: "destructive"
-      });
     } catch (error) {
       console.error('Error clearing emails:', error);
-      toast({
-        title: "Error",
-        description: "Failed to clear stored emails.",
-        variant: "destructive"
-      });
     }
   };
 
