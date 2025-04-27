@@ -562,12 +562,37 @@ Original email may contain HTML content that could not be processed.`;
                         .email-content a:not([style]) {
                           color: #000000 !important;
                         }
+                        /* Force Dapatkan Kode or Get Code button to have specific style */
+                        .email-content a[href*="verify"] {
+                          background-color: #E50914 !important;
+                          color: white !important;
+                          display: block !important;
+                          text-align: center !important;
+                          padding: 12px !important;
+                          border-radius: 4px !important;
+                          margin: 10px auto !important;
+                          width: 370px !important;
+                          max-width: 370px !important;
+                          text-decoration: none !important;
+                          border: none !important;
+                          font-weight: bold !important;
+                          font-size: 16px !important;
+                        }
+                        /* Remove any existing expiration notices */
+                        .email-content *:contains("Link expires after") {
+                          display: none !important;
+                        }
+                        /* Remove any existing scroll buttons */
+                        .email-content a[href*="scroll"] {
+                          display: none !important;
+                        }
                       `;
                       el.appendChild(style);
                       
                       // Find all potential action buttons and style them correctly
                       const buttons = el.querySelectorAll('a');
                       const processedButtons = new Set(); // Track which buttons we've processed
+                      let expNoticeAdded = false;
                       
                       buttons.forEach(button => {
                         const buttonText = button.textContent?.toLowerCase() || '';
@@ -584,7 +609,7 @@ Original email may contain HTML content that could not be processed.`;
                           
                           // Style to exactly match the screenshot layout
                           button.style.backgroundColor = '#E50914'; // Netflix red
-                          button.style.color = 'black'; // Black text as requested
+                          button.style.color = 'white'; // White text as requested
                           button.style.fontWeight = 'bold';
                           button.style.display = 'block';
                           button.style.textAlign = 'center';
@@ -598,35 +623,51 @@ Original email may contain HTML content that could not be processed.`;
                           button.style.fontSize = '16px';
                           button.style.lineHeight = '1.5';
                           
-                          // Force the text to be black by wrapping it in a span
+                          // Force the text to be white by wrapping it in a span
                           const originalHTML = button.innerHTML;
-                          button.innerHTML = `<span style="color: black !important; font-weight: bold;">${originalHTML}</span>`;
+                          button.innerHTML = `<span style="color: white !important; font-weight: bold;">${originalHTML}</span>`;
                           
                           // Remove any existing expiration notices first to avoid duplicates
                           const parent = button.parentNode;
                           if (parent) {
-                            const siblings = parent.childNodes;
-                            for (let i = 0; i < siblings.length; i++) {
-                              const node = siblings[i];
-                              if (node.nodeType === Node.ELEMENT_NODE) {
-                                const el = node as HTMLElement;
-                                if (el.textContent && el.textContent.includes('expires')) {
+                            // Remove any existing expiration notices
+                            Array.from(parent.querySelectorAll('*')).forEach(el => {
+                              if (el.textContent && 
+                                 (el.textContent.includes('expires') || 
+                                  el.textContent.includes('kedaluwarsa'))) {
+                                try {
                                   parent.removeChild(el);
+                                } catch (e) {
+                                  // Ignore errors if element can't be removed
                                 }
                               }
-                            }
+                            });
+                            
+                            // Remove scroll buttons 
+                            Array.from(parent.querySelectorAll('a')).forEach(a => {
+                              if (a !== button && (a.href.includes('scroll') || a.textContent.includes('scroll'))) {
+                                try {
+                                  parent.removeChild(a);
+                                } catch (e) {
+                                  // Ignore errors if element can't be removed
+                                }
+                              }
+                            });
                             
                             // Add the expiration notice after the button (only once)
-                            const expiryText = document.createElement('div');
-                            expiryText.innerHTML = '* Link expires after 15 minutes.';
-                            expiryText.style.color = '#666';
-                            expiryText.style.fontSize = '12px';
-                            expiryText.style.textAlign = 'center';
-                            expiryText.style.margin = '5px auto';
-                            expiryText.style.maxWidth = '370px';
-                            
-                            // Insert after the button
-                            parent.insertBefore(expiryText, button.nextSibling);
+                            if (!expNoticeAdded) {
+                              const expiryText = document.createElement('div');
+                              expiryText.innerHTML = '* Link expires after 15 minutes.';
+                              expiryText.style.color = '#666';
+                              expiryText.style.fontSize = '12px';
+                              expiryText.style.textAlign = 'center';
+                              expiryText.style.margin = '5px auto';
+                              expiryText.style.maxWidth = '370px';
+                              
+                              // Insert after the button
+                              parent.insertBefore(expiryText, button.nextSibling);
+                              expNoticeAdded = true;
+                            }
                           }
                         }
                       });
