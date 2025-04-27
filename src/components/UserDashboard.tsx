@@ -594,27 +594,72 @@ const UserDashboard = () => {
     }
     
     try {
-      // Use fetchEmails from DataContext to search all sources
-      const filteredEmails = await fetchEmails(filterValue);
-      
-      // Sort by date, newest first
-      const sortedResults = filteredEmails.sort((a, b) => {
-        if (!a.date || !b.date) return 0;
-        return new Date(b.date).getTime() - new Date(a.date).getTime();
+      // Use supabase function to search emails
+      const { data, error } = await supabase.functions.invoke('search-emails', {
+        body: { 
+          searchEmail: defaultSearchEmail, 
+          searchQuery: filterValue,
+          includeRead: true, 
+          includeUnread: true,
+          includeForwarded: true,
+          includeDomainForwarded: true,
+          includeImportant: true,
+          includeGrouped: true,
+          includeUngrouped: true,
+          minutesBack: 30,
+          fetchUnread: true
+        }
       });
       
-      setSearchResults(sortedResults);
-      setCurrentPage(1);
+      if (error) {
+        console.error('Error during search:', error);
+        return;
+      }
       
-      // Show a toast ONLY if results are found
-      if (sortedResults.length > 0) {
-        toast({
-          title: "Emails Found",
-          description: `Found ${sortedResults.length} matches for "${filterValue}"`,
+      if (data && data.emails && Array.isArray(data.emails)) {
+        // Format emails
+        const formattedEmails: Email[] = data.emails.map((email: any) => ({
+          id: email.id,
+          from: email.from || "Unknown Sender",
+          to: email.to || "Unknown Recipient",
+          subject: email.subject || "No Subject",
+          body: email.body || "No content available",
+          date: email.date || new Date().toISOString(),
+          isRead: email.isRead || false,
+          isHidden: false,
+          matchedIn: email.matchedIn || "unknown",
+          extractedRecipients: email.extractedRecipients || [],
+          rawMatch: email.rawMatch || null,
+          isForwardedEmail: email.isForwardedEmail || false,
+          isCluster: email.isCluster || false,
+          isDomainForwarded: email.isDomainForwarded || false,
+          isImportant: email.isImportant || false,
+          isGrouped: email.isGrouped || false
+        }));
+        
+        // Sort by date, newest first
+        const sortedResults = formattedEmails.sort((a, b) => {
+          if (!a.date || !b.date) return 0;
+          return new Date(b.date).getTime() - new Date(a.date).getTime();
         });
+        
+        setSearchResults(sortedResults);
+        setCurrentPage(1);
+        
+        // Show a toast ONLY if results are found
+        if (sortedResults.length > 0) {
+          toast({
+            title: "Emails Found",
+            description: `Found ${sortedResults.length} matches for "${filterValue}"`,
+          });
+        }
+      } else {
+        // No results
+        setSearchResults([]);
       }
     } catch (error) {
       console.error('Error during search:', error);
+      setSearchResults([]);
     }
   };
 

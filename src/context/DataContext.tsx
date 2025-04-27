@@ -10,7 +10,7 @@ interface DataContextType {
   googleConfigs: GoogleConfig[];
   emails: Email[];
   emailLimit: number;
-  fetchEmails: (searchQuery: string) => Promise<Email[]>;
+  fetchEmails: (searchQuery?: string) => Promise<Email[]>;
   addAccessToken: (token: AccessToken) => void;
   deleteAccessToken: (id: string) => void;
   blockAccessToken: (id: string) => void;
@@ -333,8 +333,14 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const fetchEmails = async () => {
+  const fetchEmails = async (searchQuery?: string) => {
     try {
+      if (searchQuery) {
+        // If searchQuery is provided, use searchEmails function
+        return await searchEmails(searchQuery);
+      }
+      
+      // Original functionality for fetching all emails
       const { data, error } = await supabase
         .from('emails')
         .select('*')
@@ -354,9 +360,12 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
           isHidden: email.hidden || false
         }));
         setEmails(emailList);
+        return emailList;
       }
+      return [];
     } catch (error) {
       console.error('Error fetching emails:', error);
+      return [];
     }
   };
 
@@ -1057,7 +1066,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       googleConfigs,
       emails,
       emailLimit,
-      fetchEmails: searchEmails,
+      fetchEmails,
       addAccessToken,
       deleteAccessToken,
       blockAccessToken,
