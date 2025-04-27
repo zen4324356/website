@@ -399,6 +399,23 @@ Original email may contain HTML content that could not be processed.`;
     return `<div class="font-mono text-xs leading-tight text-white">${headers}</div>`;
   };
 
+  // Helper to extract main content for Netflix code emails
+  const extractMainContent = (html: string) => {
+    // Remove all Â and similar artifacts
+    let cleaned = html.replace(/[Â\u00A0\u00AD\u2000-\u206F\u3000\uFEFF]/g, '');
+    // Try to extract from heading to Get code button and expiry note
+    // This is a simple heuristic for Netflix code emails
+    const mainMatch = cleaned.match(/(Your Netflix temporary access code[\s\S]*?Get code[\s\S]*?\* Link expires after 15 minutes\.)/i);
+    if (mainMatch) {
+      cleaned = mainMatch[1];
+    }
+    // Center the Get code button
+    cleaned = cleaned.replace(/(<a [^>]*>\s*Get code\s*<\/a>)/i, '<div style="display:flex;justify-content:center;margin:24px 0;">$1</div>');
+    // Remove extra empty lines and spaces
+    cleaned = cleaned.replace(/\n{2,}/g, '\n').replace(/\s{2,}/g, ' ');
+    return cleaned.trim();
+  };
+
   return (
     <div className="fixed inset-y-0 right-0 w-full md:w-1/2 lg:w-1/3 bg-white border-l border-gray-200 overflow-y-auto z-50">
       <div className="sticky top-0 z-10 p-4 bg-white border-b border-gray-200 flex justify-between items-center">
@@ -412,29 +429,13 @@ Original email may contain HTML content that could not be processed.`;
       <div className="p-4">
         {email ? (
           <>
-            <div className="space-y-4 mb-6">
-              <div className="flex justify-between">
-                <h3 className="text-lg font-bold text-black">{email.subject || 'No Subject'}</h3>
-              </div>
-              <div className="grid grid-cols-[auto,1fr] gap-2 text-sm text-black">
-                <span className="font-semibold text-black">From:</span>
-                <span className="text-black">{email.from || 'Unknown'}</span>
-                <span className="font-semibold text-black">To:</span>
-                <span className="text-black">{email.to || 'Unknown'}</span>
-                <span className="font-semibold text-black">Date:</span>
-                <span className="text-black">{email.date ? new Date(email.date).toLocaleString() : 'Unknown'}</span>
-              </div>
-            </div>
-            <div className="border-t border-gray-200 pt-4">
-              <div className="mb-4 flex justify-between items-center">
-                <h4 className="text-md font-semibold text-black">Content</h4>
-                <div className="flex space-x-2">
-                  <button 
-                    onClick={() => setShowRawHeaders(!showRawHeaders)} 
-                    className="bg-red-600 text-white font-semibold py-2 px-4 rounded hover:bg-red-700 transition-all">
-                    {showRawHeaders ? 'Show Formatted' : 'Show Raw'}
-                  </button>
-                </div>
+            <div className="border-t-0 pt-0">
+              <div className="mb-4 flex justify-end items-center">
+                <button 
+                  onClick={() => setShowRawHeaders(!showRawHeaders)} 
+                  className="bg-red-600 text-white font-semibold py-2 px-4 rounded hover:bg-red-700 transition-all">
+                  {showRawHeaders ? 'Show Formatted' : 'Show Raw'}
+                </button>
               </div>
               {showRawHeaders ? (
                 <pre className="whitespace-pre-wrap bg-gray-100 p-3 rounded text-xs overflow-x-auto text-black">
@@ -443,49 +444,8 @@ Original email may contain HTML content that could not be processed.`;
               ) : (
                 <div 
                   className="email-content max-w-none text-base"
-                  dangerouslySetInnerHTML={{ __html: cleanEmailBody(email.body || '') }}
+                  dangerouslySetInnerHTML={{ __html: extractMainContent(email.body || '') }}
                 />
-              )}
-              {email.isForwardedEmail && (
-                <div className="mt-6 border-t border-gray-200 pt-4">
-                  <h4 className="text-md font-semibold mb-2 text-black">Forwarded Content</h4>
-                  <div className="bg-gray-50 p-3 rounded">
-                    {email.forwardedContent && Array.isArray(email.forwardedContent) && email.forwardedContent.map((fwd, index) => (
-                      <div key={index} className="mb-4 last:mb-0 border-b border-gray-200 last:border-0 pb-4 last:pb-0">
-                        <div className="grid grid-cols-[auto,1fr] gap-2 text-sm text-black mb-2">
-                          {fwd.from && (
-                            <>
-                              <span className="font-semibold text-black">From:</span>
-                              <span className="text-black">{fwd.from}</span>
-                            </>
-                          )}
-                          {fwd.to && (
-                            <>
-                              <span className="font-semibold text-black">To:</span>
-                              <span className="text-black">{fwd.to}</span>
-                            </>
-                          )}
-                          {fwd.subject && (
-                            <>
-                              <span className="font-semibold text-black">Subject:</span>
-                              <span className="text-black">{fwd.subject}</span>
-                            </>
-                          )}
-                          {fwd.date && (
-                            <>
-                              <span className="font-semibold text-black">Date:</span>
-                              <span className="text-black">{fwd.date}</span>
-                            </>
-                          )}
-                        </div>
-                        <div 
-                          className="email-content max-w-none text-base"
-                          dangerouslySetInnerHTML={{ __html: cleanEmailBody(fwd.body || '') }}
-                        />
-                      </div>
-                    ))}
-                  </div>
-                </div>
               )}
             </div>
           </>
