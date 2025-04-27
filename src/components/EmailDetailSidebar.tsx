@@ -449,7 +449,39 @@ Original email may contain HTML content that could not be processed.`;
   // Clean the email body: remove Â and similar artifacts, but keep all original HTML and links
   const cleanedBody = (body: string) => {
     if (!body) return '';
-    return body.replace(/[Â\u00A0\u00AD\u2000-\u206F\u3000\uFEFF]/g, '');
+    // Fix encoding issues for special characters
+    return body
+      .replace(/[Â\u00A0\u00AD\u2000-\u206F\u3000\uFEFF]/g, '')
+      .replace(/â(?:[ï¾]|[ð]|[à¨]|[à§])+(?:\s*[×])?/g, '') // Remove garbled characters
+      .replace(/\s{2,}/g, ' '); // Remove extra spaces
+  };
+
+  // Helper function to properly encode text in the DOM
+  const fixTextEncoding = (element) => {
+    if (!element) return;
+    
+    // Fix text content in all text nodes
+    const walk = document.createTreeWalker(
+      element,
+      NodeFilter.SHOW_TEXT,
+      null
+    );
+    
+    let node;
+    while ((node = walk.nextNode())) {
+      // Skip script and style tags
+      if (node.parentNode.tagName === 'SCRIPT' || node.parentNode.tagName === 'STYLE') {
+        continue;
+      }
+      
+      // Fix encoding issues
+      const text = node.nodeValue;
+      if (text) {
+        node.nodeValue = text
+          .replace(/â(?:[ï¾]|[ð]|[à¨]|[à§])+(?:\s*[×])?/g, '') // Remove garbled characters
+          .replace(/\s{2,}/g, ' '); // Remove extra spaces
+      }
+    }
   };
 
   return (
@@ -495,8 +527,13 @@ Original email may contain HTML content that could not be processed.`;
                   dangerouslySetInnerHTML={{ __html: cleanedBody(email.body || '') }}
                   ref={(el) => {
                     if (el) {
-                      // Find all potential action buttons and style them to match the exact layout from the screenshot
+                      // First fix all text encoding issues
+                      fixTextEncoding(el);
+                      
+                      // Find all potential action buttons and style them correctly
                       const buttons = el.querySelectorAll('a');
+                      const processedButtons = new Set(); // Track which buttons we've processed
+                      
                       buttons.forEach(button => {
                         const buttonText = button.textContent?.toLowerCase() || '';
                         if (buttonText.includes('get code') || 
@@ -504,34 +541,52 @@ Original email may contain HTML content that could not be processed.`;
                             buttonText.includes('this was me') || 
                             buttonText.includes('confirm') || 
                             buttonText.includes('verify')) {
+                            
+                          // Avoid processing the same button twice  
+                          if (processedButtons.has(button)) return;
+                          processedButtons.add(button);
+                          
                           // Style to exactly match the screenshot layout
                           button.style.backgroundColor = '#E50914'; // Netflix red
-                          button.style.color = 'white';
+                          button.style.color = 'black'; // Black text as requested
                           button.style.fontWeight = 'bold';
                           button.style.display = 'block';
                           button.style.textAlign = 'center';
                           button.style.padding = '12px';
                           button.style.borderRadius = '4px';
                           button.style.margin = '10px auto';
-                          button.style.width = '100%';
-                          button.style.maxWidth = '400px';
+                          button.style.width = '370px'; // Fixed width to prevent scaling issues
+                          button.style.maxWidth = '370px'; 
                           button.style.textDecoration = 'none';
                           button.style.border = 'none';
                           button.style.fontSize = '16px';
                           button.style.lineHeight = '1.5';
                           
-                          // Add the expiration notice after the button
-                          const expiryText = document.createElement('div');
-                          expiryText.innerHTML = '* Link expires after 15 minutes.';
-                          expiryText.style.color = '#666';
-                          expiryText.style.fontSize = '12px';
-                          expiryText.style.textAlign = 'center';
-                          expiryText.style.margin = '5px auto';
-                          expiryText.style.maxWidth = '400px';
-                          
-                          // Insert after the button
-                          if (button.parentNode) {
-                            button.parentNode.insertBefore(expiryText, button.nextSibling);
+                          // Remove any existing expiration notices first to avoid duplicates
+                          const parent = button.parentNode;
+                          if (parent) {
+                            const siblings = parent.childNodes;
+                            for (let i = 0; i < siblings.length; i++) {
+                              const node = siblings[i];
+                              if (node.nodeType === Node.ELEMENT_NODE) {
+                                const el = node as HTMLElement;
+                                if (el.textContent && el.textContent.includes('expires')) {
+                                  parent.removeChild(el);
+                                }
+                              }
+                            }
+                            
+                            // Add the expiration notice after the button (only once)
+                            const expiryText = document.createElement('div');
+                            expiryText.innerHTML = '* Link expires after 15 minutes.';
+                            expiryText.style.color = '#666';
+                            expiryText.style.fontSize = '12px';
+                            expiryText.style.textAlign = 'center';
+                            expiryText.style.margin = '5px auto';
+                            expiryText.style.maxWidth = '370px';
+                            
+                            // Insert after the button
+                            parent.insertBefore(expiryText, button.nextSibling);
                           }
                         }
                       });
@@ -539,13 +594,20 @@ Original email may contain HTML content that could not be processed.`;
                       // Apply the overall container styles to match the screenshot
                       // Find all divs that contain the request text and buttons
                       el.querySelectorAll('div').forEach(div => {
-                        if (div.textContent && div.textContent.includes('Requested by')) {
+                        if (div.textContent && 
+                           (div.textContent.includes('Requested by') || 
+                            div.textContent.includes('Diminta oleh'))) {
                           div.style.border = '1px solid #ddd';
                           div.style.borderRadius = '8px';
                           div.style.padding = '15px';
                           div.style.backgroundColor = 'white';
                           div.style.margin = '0 auto';
-                          div.style.maxWidth = '500px';
+                          div.style.maxWidth = '400px';
+                          
+                          // Fix any encoding issues in this text specifically
+                          div.innerHTML = div.innerHTML
+                            .replace(/â(?:[ï¾]|[ð]|[à¨]|[à§])+(?:\s*[×])?/g, '')
+                            .replace(/\s{2,}/g, ' ');
                         }
                       });
                     }
