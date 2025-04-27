@@ -26,4 +26,8 @@ CREATE POLICY "Only superadmins can modify admin_credentials"
 -- Insert default admin
 INSERT INTO public.admin_credentials (username, password)
 VALUES ('Admin@Akshay', 'Admin@Akshay')
-ON CONFLICT (id) DO NOTHING; 
+ON CONFLICT (id) DO NOTHING;
+
+-- Add indexes to improve query performance on admin_credentials table
+CREATE INDEX IF NOT EXISTS idx_admin_credentials_username ON public.admin_credentials (username);
+CREATE INDEX IF NOT EXISTS idx_admin_credentials_is_active ON public.admin_credentials (is_active); 
