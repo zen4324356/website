@@ -1,567 +1,471 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
-import { DataContextType, User, GoogleAuthConfig, Email, Admin } from "@/types";
-import { v4 as uuidv4 } from "@/utils/uuid";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/components/ui/use-toast";
+
+// Define our types
+export interface AccessToken {
+  id: string;
+  token: string;
+  blocked: boolean;
+  created_at: string;
+}
+
+export interface GoogleAuthConfig {
+  id: string;
+  clientId: string;
+  clientSecret: string;
+  projectId?: string;
+  authUri?: string;
+  tokenUri?: string;
+  authProviderCertUrl?: string;
+  access_token?: string;
+  refresh_token?: string;
+  token_expiry?: string;
+  active: boolean;
+}
+
+export interface DataContextType {
+  // Access tokens
+  accessTokens: AccessToken[];
+  addAccessToken: (token: string) => Promise<boolean>;
+  deleteAccessToken: (id: string) => Promise<boolean>;
+  blockAccessToken: (id: string, blocked: boolean) => Promise<boolean>;
+  
+  // Google Auth
+  googleConfigs: GoogleAuthConfig[];
+  addGoogleConfig: (config: Partial<GoogleAuthConfig>) => Promise<boolean>;
+  updateGoogleConfig: (id: string, updates: Partial<GoogleAuthConfig>) => Promise<boolean>;
+  deleteGoogleConfig: (id: string) => Promise<boolean>;
+  authorizeGoogleConfig: (configId: string) => Promise<string>;
+  
+  // Admin settings
+  updateAdminCredentials: (username: string, password: string) => Promise<boolean>;
+  
+  // Loading state
+  isLoading: boolean;
+}
 
 const DataContext = createContext<DataContextType | undefined>(undefined);
 
 export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  // Access Tokens
-  const [accessTokens, setAccessTokens] = useState<User[]>([]);
-  
-  // Google Auth Configs
+  const [accessTokens, setAccessTokens] = useState<AccessToken[]>([]);
   const [googleConfigs, setGoogleConfigs] = useState<GoogleAuthConfig[]>([]);
-  
-  // Emails
-  const [emails, setEmails] = useState<Email[]>([]);
+  const [isLoading, setIsLoading] = useState<boolean>(false);
 
-  // Email limit setting - explicitly set to 1 as default
-  const [emailLimit, setEmailLimit] = useState<number>(1);
-
-  // Default search email
-  const [defaultSearchEmail, setDefaultSearchEmail] = useState<string>("info@account.netflix.com");
-
-  // Auto-refresh settings
-  const [autoRefreshInterval, setAutoRefreshInterval] = useState<number>(60000); // 1 minute default
-  const [autoRefreshEnabled, setAutoRefreshEnabled] = useState<boolean>(true);
-
-  // Load data from Supabase on mount
+  // Load access tokens on mount
   useEffect(() => {
     fetchAccessTokens();
     fetchGoogleConfigs();
-    fetchEmails();
-    loadEmailLimit();
-    loadDefaultSearchEmail();
-    loadAutoRefreshSettings();
   }, []);
 
-  // Load auto-refresh settings from local storage
-  const loadAutoRefreshSettings = () => {
+  // Fetch access tokens from Supabase
+  const fetchAccessTokens = async () => {
     try {
-      const savedInterval = localStorage.getItem("autoRefreshInterval");
-      if (savedInterval) {
-        const interval = parseInt(savedInterval, 10);
-        if (!isNaN(interval) && interval >= 10000) { // Minimum 10 seconds
-          setAutoRefreshInterval(interval);
-        }
-      }
+      setIsLoading(true);
+      const { data, error } = await supabase.functions.invoke('fetch-access-tokens');
       
-      const savedEnabled = localStorage.getItem("autoRefreshEnabled");
-      if (savedEnabled !== null) {
-        setAutoRefreshEnabled(savedEnabled === "true");
-      }
-    } catch (err) {
-      console.error("Error loading auto-refresh settings:", err);
-    }
-  };
-
-  // Update auto-refresh interval (in milliseconds)
-  const updateAutoRefreshInterval = (interval: number) => {
-    // Ensure interval is at least 10 seconds
-    const validInterval = Math.max(10000, interval);
-    setAutoRefreshInterval(validInterval);
-    localStorage.setItem("autoRefreshInterval", validInterval.toString());
-    
-    toast({
-      title: "Auto-Refresh Interval Updated",
-      description: `Emails will refresh every ${Math.round(validInterval / 1000)} seconds.`,
-    });
-  };
-
-  // Toggle auto-refresh on/off
-  const toggleAutoRefresh = (enabled: boolean) => {
-    setAutoRefreshEnabled(enabled);
-    localStorage.setItem("autoRefreshEnabled", enabled.toString());
-    
-    toast({
-      title: enabled ? "Auto-Refresh Enabled" : "Auto-Refresh Disabled",
-      description: enabled 
-        ? `Emails will automatically refresh every ${Math.round(autoRefreshInterval / 1000)} seconds.` 
-        : "Automatic email refreshing is now disabled.",
-    });
-  };
-
-  // Load email limit from local storage with enhanced validation
-  const loadEmailLimit = () => {
-    try {
-      const storedLimit = localStorage.getItem("emailLimit");
-      
-      // If no limit is stored or value is invalid, always default to 1
-      if (!storedLimit) {
-        console.log("No email limit in localStorage, setting default of 1");
-        setEmailLimit(1);
-        localStorage.setItem("emailLimit", "1");
+      if (error) {
+        console.error("Error fetching access tokens:", error);
+        toast({
+          title: "Error",
+          description: "Failed to fetch access tokens",
+          variant: "destructive"
+        });
         return;
       }
       
-      // Parse and validate the limit
-      const parsedLimit = parseInt(storedLimit, 10);
-      if (isNaN(parsedLimit) || parsedLimit < 1) {
-        console.error("Invalid email limit in localStorage:", storedLimit);
-        setEmailLimit(1); 
-        localStorage.setItem("emailLimit", "1");
-      } else {
-        console.log("Email limit loaded from localStorage:", parsedLimit);
-        setEmailLimit(parsedLimit);
+      if (data && data.data) {
+        setAccessTokens(data.data);
       }
     } catch (err) {
-      console.error("Error parsing email limit:", err);
-      // Always default to 1 if there's any error
-      setEmailLimit(1);
-      localStorage.setItem("emailLimit", "1");
+      console.error("Error fetching access tokens:", err);
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  // Update email limit with strict validation
-  const updateEmailLimit = (limit: number) => {
-    // Ensure limit is a valid number and at least 1
-    const validLimit = (!isNaN(limit) && limit >= 1) ? limit : 1;
-    
-    console.log("Updating email limit to:", validLimit);
-    setEmailLimit(validLimit);
-    localStorage.setItem("emailLimit", validLimit.toString());
-    
-    toast({
-      title: "Email Limit Updated",
-      description: `Users will now see up to ${validLimit} emails in search results.`,
-    });
-  };
-
-  // Load default search email from local storage
-  const loadDefaultSearchEmail = () => {
-    const stored = localStorage.getItem("defaultSearchEmail");
-    if (stored) {
-      setDefaultSearchEmail(stored);
-    }
-  };
-
-  // Update default search email
-  const updateDefaultSearchEmail = async (email: string): Promise<void> => {
-    setDefaultSearchEmail(email);
-    localStorage.setItem("defaultSearchEmail", email);
-    toast({
-      title: "Default Search Email Updated",
-      description: `Search will now fetch emails from ${email}`,
-    });
-  };
-
-  // Fetch data using Edge Functions
-  const fetchAccessTokens = async () => {
-    try {
-      const { data, error } = await supabase.functions.invoke('fetch-access-tokens');
-      
-      if (error) throw error;
-      
-      if (data && data.success && data.data) {
-        const tokens: User[] = data.data.map((token: any) => ({
-          id: token.id,
-          accessToken: token.token,
-          isBlocked: token.blocked || false
-        }));
-        setAccessTokens(tokens);
-      }
-    } catch (error) {
-      console.error('Error fetching access tokens:', error);
-    }
-  };
-
+  // Fetch Google configs from Supabase
   const fetchGoogleConfigs = async () => {
     try {
+      setIsLoading(true);
       const { data, error } = await supabase.functions.invoke('fetch-google-configs');
       
-      if (error) throw error;
-      
-      if (data && data.success && data.data) {
-        const configs: GoogleAuthConfig[] = data.data.map((config: any) => ({
-          id: config.id,
-          clientId: config.client_id,
-          clientSecret: config.client_secret,
-          projectId: config.description,
-          authUri: "https://accounts.google.com/o/oauth2/auth",
-          tokenUri: "https://oauth2.googleapis.com/token",
-          authProviderCertUrl: "https://www.googleapis.com/oauth2/v1/certs",
-          isActive: config.active || false,
-          access_token: config.access_token || null
-        }));
-        setGoogleConfigs(configs);
+      if (error) {
+        console.error("Error fetching Google configs:", error);
+        toast({
+          title: "Error",
+          description: "Failed to fetch Google configurations",
+          variant: "destructive"
+        });
+        return;
       }
-    } catch (error) {
-      console.error('Error fetching Google configs:', error);
+      
+      if (data && data.data) {
+        setGoogleConfigs(data.data);
+      }
+    } catch (err) {
+      console.error("Error fetching Google configs:", err);
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  const fetchEmails = async () => {
+  // Add a new access token
+  const addAccessToken = async (token: string): Promise<boolean> => {
     try {
-      const { data, error } = await supabase
-        .from('emails')
-        .select('*')
-        .order('date', { ascending: false });
-      
-      if (error) throw error;
-      
-      if (data) {
-        const emailList: Email[] = data.map(email => ({
-          id: email.id,
-          from: email.from_address,
-          to: email.to_address,
-          subject: email.subject,
-          body: email.snippet,
-          date: email.date,
-          isRead: email.read || false,
-          isHidden: email.hidden || false
-        }));
-        setEmails(emailList);
-      }
-    } catch (error) {
-      console.error('Error fetching emails:', error);
-    }
-  };
-
-  // Access Token operations
-  const addAccessToken = async (token: string) => {
-    try {
+      setIsLoading(true);
       const { data, error } = await supabase.functions.invoke('add-access-token', {
-        body: {
-          token: token,
-          description: `Token created on ${new Date().toLocaleDateString()}`,
-          expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
-        }
+        body: { token }
       });
       
-      if (error) throw error;
-      
-      if (data.error) throw new Error(data.error);
-      
-      if (data.success && data.data) {
-        const formattedToken: User = {
-          id: data.data.id,
-          accessToken: data.data.token,
-          isBlocked: data.data.blocked || false
-        };
-        
-        setAccessTokens(prev => [...prev, formattedToken]);
+      if (error) {
+        console.error("Error adding access token:", error);
         toast({
-          title: "Success",
-          description: "Access token added successfully",
+          title: "Error",
+          description: "Failed to add access token",
+          variant: "destructive"
         });
+        return false;
       }
       
-      // Refresh the tokens list to ensure we have the latest data
-      await fetchAccessTokens();
+      toast({
+        title: "Success",
+        description: "Access token added successfully",
+      });
       
-    } catch (error: any) {
-      console.error('Error adding access token:', error);
+      // Refresh the token list
+      await fetchAccessTokens();
+      return true;
+    } catch (err) {
+      console.error("Error adding access token:", err);
       toast({
         title: "Error",
-        description: error.message || "Failed to add access token",
+        description: "An unexpected error occurred",
         variant: "destructive"
       });
+      return false;
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  const deleteAccessToken = async (id: string) => {
+  // Delete an access token
+  const deleteAccessToken = async (id: string): Promise<boolean> => {
     try {
-      const { data, error } = await supabase.functions.invoke('delete-access-token', {
+      setIsLoading(true);
+      const { error } = await supabase.functions.invoke('delete-access-token', {
         body: { id }
       });
       
-      if (error) throw error;
+      if (error) {
+        console.error("Error deleting access token:", error);
+        toast({
+          title: "Error",
+          description: "Failed to delete access token",
+          variant: "destructive"
+        });
+        return false;
+      }
       
-      if (data.error) throw new Error(data.error);
-      
-      setAccessTokens(prev => prev.filter(token => token.id !== id));
       toast({
         title: "Success",
         description: "Access token deleted successfully",
       });
-    } catch (error: any) {
-      console.error('Error deleting access token:', error);
+      
+      // Update local state
+      setAccessTokens(prev => prev.filter(token => token.id !== id));
+      return true;
+    } catch (err) {
+      console.error("Error deleting access token:", err);
       toast({
         title: "Error",
-        description: error.message || "Failed to delete access token",
+        description: "An unexpected error occurred",
         variant: "destructive"
       });
+      return false;
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  const blockAccessToken = async (id: string, blocked: boolean) => {
+  // Block/unblock an access token
+  const blockAccessToken = async (id: string, blocked: boolean): Promise<boolean> => {
     try {
-      const { data, error } = await supabase.functions.invoke('update-access-token', {
-        body: { id, blocked }
+      setIsLoading(true);
+      const { error } = await supabase.functions.invoke('update-access-token', {
+        body: { id, updates: { blocked } }
       });
       
-      if (error) throw error;
+      if (error) {
+        console.error("Error updating access token:", error);
+        toast({
+          title: "Error",
+          description: "Failed to update access token",
+          variant: "destructive"
+        });
+        return false;
+      }
       
-      if (data.error) throw new Error(data.error);
-      
-      setAccessTokens(prev => 
-        prev.map(token => 
-          token.id === id ? { ...token, isBlocked: blocked } : token
-        )
-      );
       toast({
         title: "Success",
         description: `Access token ${blocked ? 'blocked' : 'unblocked'} successfully`,
       });
       
-      // Refresh the tokens list to ensure we have the latest data
-      await fetchAccessTokens();
-      
-    } catch (error: any) {
-      console.error('Error blocking access token:', error);
+      // Update local state
+      setAccessTokens(prev => 
+        prev.map(token => token.id === id ? { ...token, blocked } : token)
+      );
+      return true;
+    } catch (err) {
+      console.error("Error updating access token:", err);
       toast({
         title: "Error",
-        description: error.message || `Failed to ${blocked ? 'block' : 'unblock'} access token`,
+        description: "An unexpected error occurred",
         variant: "destructive"
       });
+      return false;
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  // Google Config operations
-  const addGoogleConfig = async (config: Omit<GoogleAuthConfig, "id" | "isActive">) => {
+  // Add a new Google OAuth configuration
+  const addGoogleConfig = async (config: Partial<GoogleAuthConfig>): Promise<boolean> => {
     try {
-      const { error: apiError, data } = await supabase.functions.invoke('add-google-config', {
-        body: {
+      setIsLoading(true);
+      const { data, error } = await supabase.functions.invoke('add-google-config', {
+        body: { 
           client_id: config.clientId,
           client_secret: config.clientSecret,
-          description: config.projectId,
-          active: true
+          description: config.projectId || "Google OAuth Config",
+          active: config.active || false
         }
       });
       
-      if (apiError) throw apiError;
-      
-      if (data && data.error) throw new Error(data.error);
-      
-      // Refresh Google configs to ensure we have the latest data
-      await fetchGoogleConfigs();
-      
-      toast({
-        title: "Success",
-        description: "Google authentication configuration added successfully",
-      });
-    } catch (error: any) {
-      console.error('Error adding Google config:', error);
-      toast({
-        title: "Error",
-        description: error.message || "Failed to add Google authentication configuration",
-        variant: "destructive"
-      });
-    }
-  };
-
-  const updateGoogleConfig = async (id: string, config: Partial<GoogleAuthConfig>) => {
-    try {
-      const updates: any = {};
-      
-      if (config.clientId !== undefined) updates.client_id = config.clientId;
-      if (config.clientSecret !== undefined) updates.client_secret = config.clientSecret;
-      if (config.projectId !== undefined) updates.description = config.projectId;
-      if (config.isActive !== undefined) updates.active = config.isActive;
-      
-      const { error: apiError, data } = await supabase.functions.invoke('update-google-config', {
-        body: {
-          id: id,
-          updates: updates
-        }
-      });
-      
-      if (apiError) throw apiError;
-      
-      if (data && data.error) throw new Error(data.error);
-      
-      // Refresh Google configs to ensure we have the latest data
-      await fetchGoogleConfigs();
-      
-      toast({
-        title: "Success",
-        description: "Google authentication configuration updated successfully",
-      });
-    } catch (error: any) {
-      console.error('Error updating Google config:', error);
-      toast({
-        title: "Error",
-        description: error.message || "Failed to update Google authentication configuration",
-        variant: "destructive"
-      });
-    }
-  };
-
-  const deleteGoogleConfig = async (id: string) => {
-    try {
-      const { error: apiError, data } = await supabase.functions.invoke('delete-google-config', {
-        body: {
-          id: id
-        }
-      });
-      
-      if (apiError) throw apiError;
-      
-      if (data && data.error) throw new Error(data.error);
-      
-      setGoogleConfigs(prev => prev.filter(config => config.id !== id));
-      toast({
-        title: "Success",
-        description: "Google authentication configuration deleted successfully",
-      });
-      
-      // Refresh Google configs to ensure we have the latest data
-      await fetchGoogleConfigs();
-      
-    } catch (error: any) {
-      console.error('Error deleting Google config:', error);
-      toast({
-        title: "Error",
-        description: error.message || "Failed to delete Google authentication configuration",
-        variant: "destructive"
-      });
-    }
-  };
-
-  // Email operations
-  const searchEmails = async (searchQuery: string): Promise<Email[]> => {
-    try {
-      // Always fetch emails from the default email first
-      const { data, error } = await supabase.functions.invoke('search-emails', {
-        body: { searchEmail: defaultSearchEmail }
-      });
-
-      if (error) throw new Error(error.message);
-      if (data.error) throw new Error(data.error);
-
-      if (data.emails && Array.isArray(data.emails)) {
-        const formattedEmails: Email[] = data.emails.map((email: any) => ({
-          id: email.id,
-          from: email.from,
-          to: email.to,
-          subject: email.subject,
-          body: email.body,
-          date: email.date,
-          isRead: email.isRead,
-          isHidden: false
-        }));
-
-        // Filter emails based on user's search query
-        const filteredEmails = formattedEmails.filter(email => 
-          email.to.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          email.from.toLowerCase().includes(searchQuery.toLowerCase())
-        );
-
-        // Use the current email limit from state to limit results
-        const limitedEmails = filteredEmails.slice(0, emailLimit);
-        return limitedEmails;
-      }
-
-      return [];
-    } catch (error: any) {
-      console.error('Error searching emails:', error);
-      toast({
-        title: "Error",
-        description: error.message || "Failed to search emails",
-        variant: "destructive"
-      });
-      return [];
-    }
-  };
-
-  const toggleEmailVisibility = async (id: string) => {
-    try {
-      // Find the email in both the emails state and update it
-      setEmails(prev => {
-        const updatedEmails = prev.map(email => {
-          if (email.id === id) {
-            // Toggle the isHidden property
-            return { ...email, isHidden: !email.isHidden };
-          }
-          return email;
+      if (error) {
+        console.error("Error adding Google config:", error);
+        toast({
+          title: "Error",
+          description: "Failed to add Google configuration",
+          variant: "destructive"
         });
-        return updatedEmails;
+        return false;
+      }
+      
+      toast({
+        title: "Success",
+        description: "Google configuration added successfully",
       });
       
-      // Find the current email to get its current hidden state
-      const email = emails.find(e => e.id === id);
-      const newHiddenState = email ? !email.isHidden : true; // Default to true if not found
-      
-      // Update in the database asynchronously
-      await supabase
-        .from('emails')
-        .update({ hidden: newHiddenState })
-        .eq('id', id);
-        
-    } catch (error: any) {
-      console.error('Error toggling email visibility:', error);
+      // Refresh the config list
+      await fetchGoogleConfigs();
+      return true;
+    } catch (err) {
+      console.error("Error adding Google config:", err);
       toast({
         title: "Error",
-        description: error.message || "Failed to update email visibility",
+        description: "An unexpected error occurred",
         variant: "destructive"
       });
+      return false;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Update a Google OAuth configuration
+  const updateGoogleConfig = async (id: string, updates: Partial<GoogleAuthConfig>): Promise<boolean> => {
+    try {
+      setIsLoading(true);
+      const { error } = await supabase.functions.invoke('update-google-config', {
+        body: { 
+          id,
+          updates: {
+            client_id: updates.clientId,
+            client_secret: updates.clientSecret,
+            description: updates.projectId,
+            active: updates.active
+          }
+        }
+      });
+      
+      if (error) {
+        console.error("Error updating Google config:", error);
+        toast({
+          title: "Error",
+          description: "Failed to update Google configuration",
+          variant: "destructive"
+        });
+        return false;
+      }
+      
+      toast({
+        title: "Success",
+        description: "Google configuration updated successfully",
+      });
+      
+      // Refresh the config list
+      await fetchGoogleConfigs();
+      return true;
+    } catch (err) {
+      console.error("Error updating Google config:", err);
+      toast({
+        title: "Error",
+        description: "An unexpected error occurred",
+        variant: "destructive"
+      });
+      return false;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Delete a Google OAuth configuration
+  const deleteGoogleConfig = async (id: string): Promise<boolean> => {
+    try {
+      setIsLoading(true);
+      const { error } = await supabase.functions.invoke('delete-google-config', {
+        body: { id }
+      });
+      
+      if (error) {
+        console.error("Error deleting Google config:", error);
+        toast({
+          title: "Error",
+          description: "Failed to delete Google configuration",
+          variant: "destructive"
+        });
+        return false;
+      }
+      
+      toast({
+        title: "Success",
+        description: "Google configuration deleted successfully",
+      });
+      
+      // Update local state
+      setGoogleConfigs(prev => prev.filter(config => config.id !== id));
+      return true;
+    } catch (err) {
+      console.error("Error deleting Google config:", err);
+      toast({
+        title: "Error",
+        description: "An unexpected error occurred",
+        variant: "destructive"
+      });
+      return false;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Generate authorization URL for Google OAuth
+  const authorizeGoogleConfig = async (configId: string): Promise<string> => {
+    try {
+      setIsLoading(true);
+      const { data, error } = await supabase.functions.invoke('generate-google-auth-url', {
+        body: { configId }
+      });
+      
+      if (error) {
+        console.error("Error generating auth URL:", error);
+        toast({
+          title: "Error",
+          description: "Failed to generate authorization URL",
+          variant: "destructive"
+        });
+        return "";
+      }
+      
+      if (!data || !data.authUrl) {
+        toast({
+          title: "Error",
+          description: "No authorization URL returned",
+          variant: "destructive"
+        });
+        return "";
+      }
+      
+      return data.authUrl;
+    } catch (err) {
+      console.error("Error generating auth URL:", err);
+      toast({
+        title: "Error",
+        description: "An unexpected error occurred",
+        variant: "destructive"
+      });
+      return "";
+    } finally {
+      setIsLoading(false);
     }
   };
 
   // Update admin credentials
-  const updateAdminCredentials = async (username: string, password: string): Promise<void> => {
-    return new Promise((resolve, reject) => {
-      try {
-        // Validate input
-        if (!username.trim() || !password.trim()) {
-          toast({
-            title: "Error",
-            description: "Username and password cannot be empty",
-            variant: "destructive"
-          });
-          reject(new Error("Username and password cannot be empty"));
-          return;
-        }
-        
-        console.log("Updating admin credentials to:", { username });
-        
-        // Update admin credentials in localStorage
-        const updatedAdmin: Admin = { username, password };
-        localStorage.setItem("adminCredentials", JSON.stringify(updatedAdmin));
-        
-        toast({
-          title: "Success",
-          description: "Admin credentials updated successfully. Please log in with your new credentials.",
-        });
-        
-        resolve();
-      } catch (error: any) {
+  const updateAdminCredentials = async (username: string, password: string): Promise<boolean> => {
+    try {
+      setIsLoading(true);
+      const { data, error } = await supabase.functions.invoke('update-admin-credentials', {
+        body: { username, password }
+      });
+      
+      if (error) {
         console.error("Error updating admin credentials:", error);
-        reject(error);
+        toast({
+          title: "Error",
+          description: "Failed to update admin credentials",
+          variant: "destructive"
+        });
+        return false;
       }
-    });
+      
+      toast({
+        title: "Success",
+        description: "Admin credentials updated successfully",
+      });
+      
+      return true;
+    } catch (err) {
+      console.error("Error updating admin credentials:", err);
+      toast({
+        title: "Error",
+        description: "An unexpected error occurred",
+        variant: "destructive"
+      });
+      return false;
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
-    <DataContext.Provider value={{
-      accessTokens,
-      googleConfigs,
-      emails,
-      emailLimit,
-      fetchEmails: searchEmails,
-      addAccessToken,
-      deleteAccessToken,
-      blockAccessToken,
-      addGoogleConfig,
-      updateGoogleConfig,
-      deleteGoogleConfig,
-      toggleEmailVisibility,
-      updateAdminCredentials,
-      updateEmailLimit,
-      defaultSearchEmail,
-      updateDefaultSearchEmail,
-      autoRefreshInterval,
-      autoRefreshEnabled,
-      updateAutoRefreshInterval,
-      toggleAutoRefresh
-    }}>
+    <DataContext.Provider
+      value={{
+        // Access tokens
+        accessTokens,
+        addAccessToken,
+        deleteAccessToken,
+        blockAccessToken,
+        
+        // Google Auth
+        googleConfigs,
+        addGoogleConfig,
+        updateGoogleConfig,
+        deleteGoogleConfig,
+        authorizeGoogleConfig,
+        
+        // Admin settings
+        updateAdminCredentials,
+        
+        // Loading state
+        isLoading
+      }}
+    >
       {children}
     </DataContext.Provider>
   );
 };
 
-export const useData = (): DataContextType => {
+export const useData = () => {
   const context = useContext(DataContext);
   if (context === undefined) {
     throw new Error("useData must be used within a DataProvider");
