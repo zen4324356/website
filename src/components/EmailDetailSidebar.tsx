@@ -491,8 +491,28 @@ Original email may contain HTML content that could not be processed.`;
                 </pre>
               ) : (
                 <div 
-                  className="email-content max-w-none text-base"
+                  className="email-content max-w-none text-base" 
                   dangerouslySetInnerHTML={{ __html: cleanedBody(email.body || '') }}
+                  ref={(el) => {
+                    if (el) {
+                      // Find all potential "Get code" buttons and force them to be red with white text
+                      const buttons = el.querySelectorAll('a');
+                      buttons.forEach(button => {
+                        if (button.textContent && button.textContent.toLowerCase().includes('get code')) {
+                          button.style.backgroundColor = '#E50914';
+                          button.style.color = 'white';
+                          button.style.fontWeight = 'bold';
+                          button.style.display = 'block';
+                          button.style.textAlign = 'center';
+                          button.style.padding = '12px 24px';
+                          button.style.borderRadius = '4px';
+                          button.style.margin = '10px auto';
+                          button.style.maxWidth = '400px';
+                          button.style.textDecoration = 'none';
+                        }
+                      });
+                    }
+                  }}
                 />
               )}
             </div>
