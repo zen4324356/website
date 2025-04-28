@@ -501,7 +501,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   // Update admin credentials
   const updateAdminCredentials = async (username: string, password: string): Promise<void> => {
-    return new Promise(async (resolve, reject) => {
+    return new Promise((resolve, reject) => {
       try {
         // Validate input
         if (!username.trim() || !password.trim()) {
@@ -516,51 +516,9 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         
         console.log("Updating admin credentials to:", { username });
         
-        // Get the current admin credentials to update
-        const { data: currentAdmin, error: fetchError } = await supabase
-          .from('admin_credentials')
-          .select('*')
-          .eq('is_active', true)
-          .single();
-        
-        if (fetchError && fetchError.code !== 'PGRST116') {
-          console.error("Error fetching admin credentials:", fetchError);
-          reject(fetchError);
-          return;
-        }
-        
-        if (currentAdmin) {
-          // Update existing admin credentials
-          const { error: updateError } = await supabase
-            .from('admin_credentials')
-            .update({
-              username,
-              password,
-              updated_at: new Date().toISOString()
-            })
-            .eq('id', currentAdmin.id);
-          
-          if (updateError) {
-            console.error("Error updating admin credentials:", updateError);
-            reject(updateError);
-            return;
-          }
-        } else {
-          // Insert new admin credentials
-          const { error: insertError } = await supabase
-            .from('admin_credentials')
-            .insert({
-              username,
-              password,
-              is_active: true
-            });
-          
-          if (insertError) {
-            console.error("Error creating admin credentials:", insertError);
-            reject(insertError);
-            return;
-          }
-        }
+        // Update admin credentials in localStorage
+        const updatedAdmin: Admin = { username, password };
+        localStorage.setItem("adminCredentials", JSON.stringify(updatedAdmin));
         
         toast({
           title: "Success",

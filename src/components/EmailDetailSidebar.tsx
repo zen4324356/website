@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Email } from "@/types";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Mail, Clock, User, Forward, Users, AlertTriangle } from "lucide-react";
+import { Mail, Clock, User, Download, Forward, Users, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 
@@ -395,6 +395,41 @@ Original email may contain HTML content that could not be processed.`;
     return `<div class="font-mono text-xs leading-tight text-white">${headers}</div>`;
   };
 
+  const handleDownload = () => {
+    try {
+      // Download the original raw email if available
+      if (email.rawContent) {
+        const blob = new Blob([email.rawContent], { type: 'message/rfc822' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `email-${email.id.substring(0, 8)}.eml`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        return;
+      }
+      
+      // Fall back to creating a plain text version
+      const cleanedBody = cleanEmailBody(email.body);
+      const plainTextBody = createPlainTextEmail(cleanedBody);
+      
+      const blob = new Blob([plainTextBody], { type: 'text/plain' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `email-${email.id.substring(0, 8)}.txt`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Error downloading email:', error);
+      alert('Failed to download email. Please try again.');
+    }
+  };
+
   return (
     <div className="fixed inset-y-0 right-0 w-full md:w-1/2 lg:w-1/3 bg-netflix-black border-l border-netflix-lightgray overflow-y-auto z-50 content-card">
       <div className="sticky top-0 z-10 p-4 bg-netflix-darkgray border-b border-netflix-lightgray flex justify-between items-center content-card">
@@ -412,6 +447,13 @@ Original email may contain HTML content that could not be processed.`;
             <div className="space-y-4 mb-6">
               <div className="flex justify-between">
                 <h3 className="text-lg font-medium text-over-video">{email.subject || 'No Subject'}</h3>
+                {email.rawContent && (
+                  <button 
+                    onClick={handleDownload} 
+                    className="netflix-button button-over-video">
+                    Download
+                  </button>
+                )}
               </div>
               
               <div className="grid grid-cols-[auto,1fr] gap-2 text-sm text-netflix-lightgray">
