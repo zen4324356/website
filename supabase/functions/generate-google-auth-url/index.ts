@@ -60,7 +60,7 @@ serve(async (req) => {
       );
     }
 
-    const projectId = "vmztmhwrsyomkohkglcv"; 
+    const projectId = "uowaosnmrcsdlvogwpnr"; 
     
     // Generate the OAuth URL
     // Use the exact same redirect URI as configured in Google Cloud Console

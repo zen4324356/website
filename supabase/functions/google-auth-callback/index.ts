@@ -123,7 +123,7 @@ serve(async (req) => {
       );
     }
 
-    const projectId = "vmztmhwrsyomkohkglcv";
+    const projectId = "uowaosnmrcsdlvogwpnr";
     
     // Exchange the authorization code for tokens
     // Use the exact same redirect URI as in the auth request
