@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en" class="dark h-full">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/logo.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Admin Dashboard</title>
+    <!-- Import Inter font from Google Fonts -->
+    <link rel="stylesheet" href="https://rsms.me/inter/inter.css">
+    <!-- Preload critical assets -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <!-- Inline critical CSS to avoid FOUC -->
+    <style>
+      body, html {
+        height: 100%;
+        margin: 0;
+      }
+      body {
+        background-color: #111827;
+        color: white;
+      }
+      #root {
+        height: 100%;
+      }
+    </style>
+  </head>
+  <body class="dark:bg-dark bg-gray-900">
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
+</html> 
